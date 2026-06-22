@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bardi CCTV Local View</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f6ef;
+      --panel: #fbf8f1;
+      --ink: #1f2b1f;
+      --accent: #14532d;
+      --muted: #5d6b5d;
+      --edge: #d7dece;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background:
+        radial-gradient(circle at top left, #d7ead7 0, transparent 30%),
+        linear-gradient(160deg, #eef6e8 0%, var(--bg) 48%, #edf0e2 100%);
+      color: var(--ink);
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 60ch;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .layout {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: minmax(0, 2.5fr) minmax(280px, 1fr);
+    }
+
+    .panel {
+      background: rgba(251, 248, 241, 0.92);
+      border: 1px solid var(--edge);
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(43, 57, 43, 0.08);
+      overflow: hidden;
+    }
+
+    .feed-grid {
+      display: grid;
+      gap: 18px;
+      padding: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+
+    .camera-card {
+      border: 1px solid var(--edge);
+      border-radius: 18px;
+      background: rgba(245, 246, 238, 0.9);
+      overflow: hidden;
+    }
+
+    .camera-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--edge);
+    }
+
+    .camera-head h2 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .camera-head p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .viewer {
+      position: relative;
+      background: #101514;
+      aspect-ratio: 16 / 9;
+    }
+
+    .viewer img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #111;
+    }
+
+    .badge {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(9, 15, 12, 0.72);
+      color: #f7fff8;
+      font-size: 0.88rem;
+      backdrop-filter: blur(10px);
+    }
+
+    .sidebar {
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .sidebar h2 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .sidebar p,
+    .sidebar li,
+    .sidebar code {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .sidebar ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .value {
+      display: block;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #f2f5ec;
+      border: 1px solid var(--edge);
+      word-break: break-all;
+      color: #294129;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.9rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 16px;
+      cursor: pointer;
+      background: var(--accent);
+      color: #f4fff5;
+      font-weight: 600;
+    }
+
+    button.secondary {
+      background: #e7efe3;
+      color: #294129;
+    }
+
+    .footer {
+      padding: 16px 20px 20px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <h1>Bardi CCTV Local Web View</h1>
+      <p>
+        Halaman ini menarik dua stream CCTV dari bridge lokal VLC. Jika salah satu stream putus, halaman akan mencoba menyambung ulang secara otomatis.
+      </p>
+    </section>
+
+    <section class="layout">
+      <article class="panel">
+        <div class="feed-grid" id="feedGrid">
+          <div class="camera-card">
+            <div class="camera-head">
+              <div>
+                <h2>Loading cameras...</h2>
+                <p>Preparing local bridge</p>
+              </div>
+            </div>
+            <div class="viewer">
+              <div class="badge">Connecting...</div>
+            </div>
+          </div>
+        </div>
+        <div class="footer">
+          Jika satu panel menunjukkan reconnecting, biarkan beberapa detik atau tekan tombol reload semua untuk memaksa stream dibuka ulang.
+        </div>
+      </article>
+
+      <aside class="panel sidebar">
+        <div class="field">
+          <h2>Web UI</h2>
+          <span class="value" id="uiUrl"></span>
+        </div>
+
+        <div class="field">
+          <h2>Camera Feeds</h2>
+          <span class="value" id="cameraList">Loading...</span>
+        </div>
+
+        <div class="actions">
+          <button id="reloadAll">Reload All</button>
+          <button class="secondary" id="openCam1">Open Cam 1 Raw</button>
+          <button class="secondary" id="openCam2">Open Cam 2 Raw</button>
+        </div>
+
+        <div class="field">
+          <h2>Notes</h2>
+          <ul>
+            <li>Browser tidak membuka RTSP langsung, jadi setiap kamera dijembatani menjadi HTTP/MJPEG.</li>
+            <li>Kamera 1 memakai substream dari `192.168.1.9`.</li>
+            <li>Kamera 2 memakai `Streaming/Channels/102` dari `192.168.1.43:8554`.</li>
+            <li>Untuk akses dari device lain di LAN, buka URL web UI memakai IP laptop ini.</li>
+          </ul>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const uiUrl = window.location.href;
+    const feedGrid = document.getElementById("feedGrid");
+    const cameraList = document.getElementById("cameraList");
+    const retryTimers = new Map();
+    let cameras = [];
+
+    document.getElementById("uiUrl").textContent = uiUrl;
+
+    function setBadge(card, text, color) {
+      const badge = card.querySelector(".badge");
+      badge.textContent = text;
+      badge.style.background = color;
+    }
+
+    function streamUrlFor(camera) {
+      return `${camera.streamPath}?ts=${Date.now()}`;
+    }
+
+    function retryCamera(camera, card) {
+      const existing = retryTimers.get(camera.id);
+      if (existing) {
+        clearTimeout(existing);
+      }
+
+      setBadge(card, "Reconnecting...", "rgba(148, 102, 12, 0.84)");
+      const timer = setTimeout(() => {
+        const img = card.querySelector("img");
+        img.src = streamUrlFor(camera);
+      }, 2500);
+      retryTimers.set(camera.id, timer);
+    }
+
+    function buildCard(camera) {
+      const card = document.createElement("div");
+      card.className = "camera-card";
+      card.dataset.cameraId = camera.id;
+      card.innerHTML = `
+        <div class="camera-head">
+          <div>
+            <h2>${camera.name}</h2>
+            <p>${camera.ip}</p>
+          </div>
+        </div>
+        <div class="viewer">
+          <div class="badge">Connecting...</div>
+          <img alt="${camera.name}">
+        </div>
+      `;
+
+      const img = card.querySelector("img");
+      img.addEventListener("error", () => {
+        setBadge(card, "Stream error", "rgba(112, 26, 26, 0.82)");
+        retryCamera(camera, card);
+      });
+
+      img.addEventListener("load", () => {
+        setBadge(card, "Live", "rgba(11, 76, 35, 0.82)");
+      });
+
+      img.src = streamUrlFor(camera);
+      return card;
+    }
+
+    async function refreshStatus() {
+      try {
+        const response = await fetch("/api/status", { cache: "no-store" });
+        const payload = await response.json();
+        for (const camera of cameras) {
+          const card = document.querySelector(`[data-camera-id="${camera.id}"]`);
+          if (!card) {
+            continue;
+          }
+
+          if (payload.cameras[camera.id]) {
+            setBadge(card, "Live", "rgba(11, 76, 35, 0.82)");
+          } else {
+            retryCamera(camera, card);
+          }
+        }
+      } catch (error) {
+        for (const camera of cameras) {
+          const card = document.querySelector(`[data-camera-id="${camera.id}"]`);
+          if (card) {
+            setBadge(card, "Status unavailable", "rgba(112, 26, 26, 0.82)");
+          }
+        }
+      }
+    }
+
+    async function init() {
+      const response = await fetch("/api/cameras", { cache: "no-store" });
+      const payload = await response.json();
+      cameras = payload.cameras;
+
+      cameraList.textContent = cameras
+        .map((camera) => `${camera.name} -> ${camera.streamPath}`)
+        .join("\n");
+
+      feedGrid.innerHTML = "";
+      cameras.forEach((camera) => feedGrid.appendChild(buildCard(camera)));
+
+      document.getElementById("reloadAll").addEventListener("click", () => {
+        cameras.forEach((camera) => {
+          const card = document.querySelector(`[data-camera-id="${camera.id}"]`);
+          if (!card) {
+            return;
+          }
+          const img = card.querySelector("img");
+          img.src = streamUrlFor(camera);
+        });
+      });
+
+      document.getElementById("openCam1").addEventListener("click", () => {
+        const camera = cameras.find((item) => item.id === "1");
+        if (camera) {
+          window.open(camera.streamPath, "_blank", "noopener");
+        }
+      });
+
+      document.getElementById("openCam2").addEventListener("click", () => {
+        const camera = cameras.find((item) => item.id === "2");
+        if (camera) {
+          window.open(camera.streamPath, "_blank", "noopener");
+        }
+      });
+
+      await refreshStatus();
+      window.setInterval(refreshStatus, 4000);
+    }
+
+    init().catch(() => {
+      cameraList.textContent = "Failed to load camera configuration";
+    });
+  </script>
+</body>
+</html>

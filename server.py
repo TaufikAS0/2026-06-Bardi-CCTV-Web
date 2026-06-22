@@ -183,12 +183,19 @@ def build_handler(directory, cameras, feed_stores):
         def do_GET(self):
             clean_path = self.path.split("?", 1)[0]
 
-            if clean_path in ("/stream.mjpg", "/camera1.mjpg"):
-                self.serve_cached_mjpeg("1")
-                return
-
-            if clean_path == "/camera2.mjpg":
-                self.serve_cached_mjpeg("2")
+            legacy_camera_map = {
+                "/stream.mjpg": "1",
+                "/camera1.mjpg": "1",
+                "/camera2.mjpg": "2",
+            }
+            if clean_path in legacy_camera_map:
+                camera_id = legacy_camera_map[clean_path]
+                if camera_id not in cameras and clean_path == "/stream.mjpg" and cameras:
+                    camera_id = next(iter(cameras.keys()))
+                if camera_id in cameras:
+                    self.serve_cached_mjpeg(camera_id)
+                    return
+                self.send_error(404, "Unknown camera")
                 return
 
             if clean_path.startswith("/camera/") and clean_path.endswith("/stream.mjpg"):

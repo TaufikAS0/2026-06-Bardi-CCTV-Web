@@ -4,7 +4,9 @@ param(
   [int]$Camera1StreamPort = 18080,
   [int]$Camera2StreamPort = 18082,
   [int]$UiPort = 18081,
-  [string]$BindAddress = '0.0.0.0'
+  [string]$BindAddress = '0.0.0.0',
+  [switch]$SkipCamera1,
+  [switch]$SkipCamera2
 )
 
 $ErrorActionPreference = 'Stop'
@@ -88,6 +90,8 @@ function Start-VlcSceneBridge {
 
   $vlcArgs = @(
     '-I', 'dummy',
+    '--network-caching=500',
+    '--rtsp-tcp',
     '--no-audio',
     '--video-filter=scene',
     '--scene-ratio=15',
@@ -100,6 +104,28 @@ function Start-VlcSceneBridge {
   $vlcProcess = Start-Process -FilePath $vlcPath -ArgumentList $vlcArgs -WindowStyle Hidden -PassThru
   Set-Content -LiteralPath $PidFile -Value $vlcProcess.Id
   return $vlcProcess
+}
+
+function Wait-SceneFrames {
+  param(
+    [string]$SceneDir,
+    [int]$TimeoutSeconds = 8
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    $freshFile = Get-ChildItem -LiteralPath $SceneDir -Filter '*.jpg' -ErrorAction SilentlyContinue |
+      Sort-Object LastWriteTime -Descending |
+      Select-Object -First 1
+
+    if ($freshFile) {
+      return $true
+    }
+
+    Start-Sleep -Milliseconds 500
+  }
+
+  return $false
 }
 
 function Wait-VlcBridgePort {
@@ -122,23 +148,72 @@ function Wait-VlcBridgePort {
   throw "Bridge stream pada port $StreamPort tidak listen dalam waktu yang diharapkan"
 }
 
-Start-VlcSceneBridge -CameraRtspUri $Camera1RtspUri -SceneDir $cam1SceneDir -PidFile $vlc1PidFile | Out-Null
-Start-Sleep -Seconds 1
-Start-VlcBridge -CameraRtspUri $Camera2RtspUri -StreamPort $Camera2StreamPort -PidFile $vlc2PidFile | Out-Null
-Wait-VlcBridgePort -StreamPort $Camera2StreamPort
-Start-Sleep -Seconds 6
+$cameraSpecs = @()
+$cameraWarnings = @()
 
-$camera1Spec = '1|Bardi Camera 1|192.168.1.9|scene-dir|{0}' -f $cam1SceneDir
-$camera2Spec = '2|Bardi Camera 2|192.168.1.43|mjpeg|http://127.0.0.1:{0}/stream.mjpg' -f $Camera2StreamPort
+if (-not $SkipCamera1) {
+  try {
+    Start-VlcSceneBridge -CameraRtspUri $Camera1RtspUri -SceneDir $cam1SceneDir -PidFile $vlc1PidFile | Out-Null
+    Start-Sleep -Seconds 1
+    if (Wait-SceneFrames -SceneDir $cam1SceneDir) {
+      $cameraSpecs += ('1|Bardi Camera 1|192.168.1.9|scene-dir|{0}' -f $cam1SceneDir)
+    } else {
+      $cameraWarnings += 'Kamera 1 tidak menghasilkan frame baru, jadi untuk sementara tidak dimasukkan ke Web UI.'
+      Stop-RecordedProcess -PidFile $vlc1PidFile
+    }
+  } catch {
+    $cameraWarnings += ('Kamera 1 gagal start: {0}' -f $_.Exception.Message)
+    Stop-RecordedProcess -PidFile $vlc1PidFile
+  }
+}
 
-$pythonArgString = ('"{0}" --port {1} --bind {2} --directory "{3}" --camera "{4}" --camera "{5}"' -f
-  $serverScript,
-  $UiPort,
-  $BindAddress,
-  $scriptDir,
-  $camera1Spec,
-  $camera2Spec
+if (-not $SkipCamera2) {
+  try {
+    Start-VlcBridge -CameraRtspUri $Camera2RtspUri -StreamPort $Camera2StreamPort -PidFile $vlc2PidFile | Out-Null
+    try {
+      Wait-VlcBridgePort -StreamPort $Camera2StreamPort
+    } catch {
+      $cameraWarnings += ('Bridge Kamera 2 belum listen stabil: {0}' -f $_.Exception.Message)
+    }
+
+    $cameraSpecs += ('2|Bardi Camera 2|192.168.1.43|mjpeg|http://127.0.0.1:{0}/stream.mjpg' -f $Camera2StreamPort)
+  } catch {
+    $cameraWarnings += ('Kamera 2 gagal start: {0}' -f $_.Exception.Message)
+    Stop-RecordedProcess -PidFile $vlc2PidFile
+  }
+}
+
+if ($cameraSpecs.Count -eq 0) {
+  throw 'Tidak ada kamera yang berhasil dipersiapkan untuk Web UI.'
+}
+
+function Quote-Arg {
+  param([string]$Value)
+
+  if ($null -eq $Value) {
+    return '""'
+  }
+
+  if ($Value -match '[\s|"]') {
+    return '"' + $Value.Replace('"', '\"') + '"'
+  }
+
+  return $Value
+}
+
+$pythonArgs = @(
+  (Quote-Arg $serverScript),
+  '--port', $UiPort,
+  '--bind', $BindAddress,
+  '--directory', (Quote-Arg $scriptDir)
 )
+
+foreach ($cameraSpec in $cameraSpecs) {
+  $pythonArgs += '--camera'
+  $pythonArgs += (Quote-Arg $cameraSpec)
+}
+
+$pythonArgString = $pythonArgs -join ' '
 
 $null = Remove-Item -LiteralPath $httpStdoutFile -Force -ErrorAction SilentlyContinue
 $null = Remove-Item -LiteralPath $httpStderrFile -Force -ErrorAction SilentlyContinue
@@ -164,8 +239,15 @@ Write-Host "Camera 1 RTSP: $Camera1RtspUri"
 Write-Host "Camera 2 RTSP: $Camera2RtspUri"
 Write-Host "Camera 1 Scene Dir: $cam1SceneDir"
 Write-Host "Camera 2 MJPEG: http://localhost:$Camera2StreamPort/stream.mjpg"
-Write-Host "Browser Cam 1: http://localhost:$UiPort/camera/1/stream.mjpg"
-Write-Host "Browser Cam 2: http://localhost:$UiPort/camera/2/stream.mjpg"
+if ($cameraSpecs -match '^1\|') {
+  Write-Host "Browser Cam 1: http://localhost:$UiPort/camera/1/stream.mjpg"
+}
+if ($cameraSpecs -match '^2\|') {
+  Write-Host "Browser Cam 2: http://localhost:$UiPort/camera/2/stream.mjpg"
+}
+foreach ($warning in $cameraWarnings) {
+  Write-Warning $warning
+}
 Write-Host "Web UI:"
 $listenUrls | ForEach-Object { Write-Host "  $_" }
 Write-Host "Stop dengan: powershell -ExecutionPolicy Bypass -File `"$scriptDir\stop-bardi-cctv-web.ps1`""

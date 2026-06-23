@@ -1,13 +1,13 @@
-# 2026-06-Bardi-CCTV-Web
+# CCTV_HACK Ghost Grid
 
-Local dashboard untuk menampilkan dua kamera Bardi di browser melalui bridge lokal.
+Local dashboard untuk menampilkan dua kamera LAN di browser melalui bridge lokal.
 
 ## Files
 
 - `index.html`: UI dua kamera
 - `server.py`: local proxy/cache server untuk stream browser
-- `start-bardi-cctv-web.ps1`: start bridge lokal
-- `stop-bardi-cctv-web.ps1`: stop bridge lokal
+- launcher PowerShell untuk menyalakan bridge lokal
+- launcher PowerShell untuk mematikan bridge lokal
 - `CLAUDE-HANDOFF.md`: batas scope untuk redesign UI oleh Claude
 
 ## Notes

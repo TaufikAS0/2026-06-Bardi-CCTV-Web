@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#05080d">
-  <title>BARDI · Surveillance Grid</title>
+  <title>CCTV_HACK · Ghost Grid</title>
   <style>
     /* ============================================================
-       BARDI SURVEILLANCE GRID — futuristic CCTV control deck
+       CCTV_HACK GHOST GRID — futuristic CCTV control deck
        Single-file UI. Themeable. Settings persist in localStorage.
        ============================================================ */
 
@@ -161,6 +161,7 @@
     }
     .seg button:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
     .seg button.active { color: #04070c; background: var(--accent); box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.45); }
+    #modeSeg button { width: auto; min-width: 58px; padding: 0 10px; }
 
     .iconbtn {
       width: 40px; height: 40px; flex: none;
@@ -199,6 +200,8 @@
     }
     @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
     .cam:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), 0.4); box-shadow: 0 28px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(var(--accent-rgb), 0.12); }
+    .cam.ghost-slot { border-style: dashed; opacity: 0.9; }
+    .cam.ghost-slot .demo { filter: grayscale(1) brightness(0.38); animation: none; }
 
     .screen {
       position: relative;
@@ -470,7 +473,7 @@
           <span class="ring"></span><span class="ring inner"></span><span class="sweep"></span>
         </div>
         <div class="brand-text">
-          <span class="brand-name" id="brandName">BARDI</span>
+          <span class="brand-name" id="brandName">CCTV_HACK</span>
           <span class="brand-sub">Surveillance Grid</span>
         </div>
       </div>
@@ -479,6 +482,10 @@
         <div class="stat" data-tip-title="Status armada" data-tip="Jumlah kamera yang sedang menyiarkan live dibanding total kamera terdaftar.">
           <span class="k">Feeds</span>
           <span class="v"><span class="on" id="onlineCount">0</span> / <span id="totalCount">0</span></span>
+        </div>
+        <div class="stat" data-tip-title="Beban host" data-tip="Jumlah viewer aktif yang sedang membuka dashboard ini, serta jumlah stream MJPEG aktif yang sedang dibuka dari server.">
+          <span class="k">Load</span>
+          <span class="v"><span id="viewerCount">0</span>U / <span id="streamCount">0</span>S</span>
         </div>
         <div class="stat" data-tip-title="Waktu sistem" data-tip="Jam lokal perangkat ini. Dipakai sebagai stempel waktu overlay pada tiap kamera.">
           <span class="k">System</span>
@@ -500,6 +507,11 @@
           <button data-cols="2">2</button>
           <button data-cols="3">3</button>
           <button data-cols="4">4</button>
+        </div>
+
+        <div class="seg" id="modeSeg" data-tip-title="Mode feed" data-tip="FAST memakai stream MJPEG langsung agar gerakan terasa lebih hidup. SHARP memakai snapshot JPG berulang yang biasanya lebih hemat dan kadang lebih tajam.">
+          <button data-feed-mode="fast">FAST</button>
+          <button data-feed-mode="sharp" class="active">SHARP</button>
         </div>
 
         <button class="iconbtn accent" id="spotBtn" data-tip-title="Mode Spotlight" data-tip="Tampilkan satu kamera layar penuh dan putar otomatis (slideshow) antar kamera. Tekan SPASI untuk play/pause.">
@@ -571,7 +583,7 @@
         <span class="label">Identitas Sistem</span>
         <div class="field">
           <label>Nama sistem (judul atas)</label>
-          <input type="text" id="setBrand" maxlength="22" placeholder="BARDI">
+          <input type="text" id="setBrand" maxlength="22" placeholder="CCTV_HACK">
         </div>
       </div>
 
@@ -590,6 +602,14 @@
             <option value="2">2 kolom</option>
             <option value="3">3 kolom</option>
             <option value="4">4 kolom</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Total feed slots</label>
+          <select id="setFeedSlots">
+            <option value="2">2 slot</option>
+            <option value="4">4 slot</option>
+            <option value="8">8 slot</option>
           </select>
         </div>
       </div>
@@ -633,8 +653,8 @@
     // ----------------------------------------------------------
     // Storage
     // ----------------------------------------------------------
-    var SETTINGS_KEY = "bardi.cctv.settings.v1";
-    var CAMS_KEY = "bardi.cctv.cameras.v1";
+    var SETTINGS_KEY = "cctvhack.ghostgrid.settings.v1";
+    var CAMS_KEY = "cctvhack.ghostgrid.cameras.v1";
 
     var ACCENTS = {
       cyan:    { c: "#22d3ee", rgb: "34, 211, 238" },
@@ -645,9 +665,11 @@
     };
 
     var defaults = {
-      brand: "BARDI",
+      brand: "CCTV_HACK",
       accent: "cyan",
       cols: "auto",
+      feedSlots: 4,
+      feedMode: "sharp",
       hud: true,
       scan: true,
       info: true,
@@ -679,12 +701,16 @@
     var clockEl = document.getElementById("clock");
     var onlineCountEl = document.getElementById("onlineCount");
     var totalCountEl = document.getElementById("totalCount");
+    var viewerCountEl = document.getElementById("viewerCount");
+    var streamCountEl = document.getElementById("streamCount");
     var brandEl = document.getElementById("brandName");
     var searchEl = document.getElementById("search");
 
     var cameras = [];          // merged camera objects
     var cards = {};            // id -> { el, img, state, failSince, retry }
     var demoMode = false;
+    var VIEWER_SESSION_KEY = "cctvhack.ghostgrid.viewer.sid.v1";
+    var viewerSessionId = ensureViewerSessionId();
 
     // ----------------------------------------------------------
     // Tooltip system (hover help, the "?" behaviour)
@@ -727,6 +753,18 @@
       });
     }
 
+    function ensureViewerSessionId() {
+      try {
+        var existing = sessionStorage.getItem(VIEWER_SESSION_KEY);
+        if (existing) return existing;
+        var created = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("viewer-" + Date.now() + "-" + Math.random().toString(16).slice(2));
+        sessionStorage.setItem(VIEWER_SESSION_KEY, created);
+        return created;
+      } catch (e) {
+        return "viewer-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+      }
+    }
+
     // ----------------------------------------------------------
     // Theme / settings application
     // ----------------------------------------------------------
@@ -734,12 +772,13 @@
       var a = ACCENTS[settings.accent] || ACCENTS.cyan;
       document.documentElement.style.setProperty("--accent", a.c);
       document.documentElement.style.setProperty("--accent-rgb", a.rgb);
-      brandEl.textContent = settings.brand || "BARDI";
+      brandEl.textContent = settings.brand || "CCTV_HACK";
       document.body.classList.toggle("no-hud", !settings.hud);
       document.body.classList.toggle("no-scan", !settings.scan);
       document.body.classList.toggle("no-info", !settings.info);
       document.body.classList.toggle("no-clock", !settings.clock);
       applyCols(settings.cols);
+      syncFeedModeSeg();
     }
     function applyCols(cols) {
       grid.dataset.cols = cols;
@@ -748,6 +787,15 @@
       // sync segmented control
       Array.prototype.forEach.call(document.querySelectorAll("#layoutSeg button"), function (b) {
         b.classList.toggle("active", b.dataset.cols === String(cols));
+      });
+    }
+    function normalizeFeedMode(mode) {
+      return mode === "fast" ? "fast" : "sharp";
+    }
+    function syncFeedModeSeg() {
+      var mode = normalizeFeedMode(settings.feedMode);
+      Array.prototype.forEach.call(document.querySelectorAll("#modeSeg button"), function (b) {
+        b.classList.toggle("active", b.dataset.feedMode === mode);
       });
     }
 
@@ -778,16 +826,48 @@
         ip: raw.ip,
         streamPath: raw.streamPath,
         latestPath: raw.latestPath,
+        profiles: raw.profiles || null,
         hidden: !!ov.hidden,
         flip: !!ov.flip,
         demo: !!raw.demo
       };
     }
 
+    function configuredFeedSlots() {
+      return clampNum(settings.feedSlots, 2, 8, 4);
+    }
+
+    function makeGhostSlot(slotNumber) {
+      return {
+        id: "slot-" + slotNumber,
+        name: "EMPTY SLOT " + slotNumber,
+        baseName: "EMPTY SLOT " + slotNumber,
+        zone: "",
+        ip: "OFFLINE / NO CONNECTION",
+        streamPath: null,
+        latestPath: null,
+        profiles: null,
+        hidden: false,
+        flip: false,
+        demo: false,
+        ghost: true
+      };
+    }
+
+    function renderableCameras() {
+      var visible = cameras.filter(function (c) { return !c.hidden; });
+      var target = configuredFeedSlots();
+      var result = visible.slice();
+      for (var slot = result.length + 1; slot <= target; slot++) {
+        result.push(makeGhostSlot(slot));
+      }
+      return result;
+    }
+
     function demoCameras() {
       var names = ["Gerbang Depan", "Halaman Belakang", "Garasi", "Lorong", "Gudang", "Atap"];
       return names.map(function (n, i) {
-        return { id: String(i + 1), name: "Bardi Camera " + (i + 1), ip: "192.168.1." + (10 + i), streamPath: null, latestPath: null, demo: true };
+        return { id: String(i + 1), name: "CCTV_HACK Node " + (i + 1), ip: "192.168.1." + (10 + i), streamPath: null, latestPath: null, demo: true };
       });
     }
 
@@ -847,7 +927,7 @@
 
       grid.appendChild(el);
 
-      var rec = { el: el, cam: cam, img: el.querySelector(".feed"), failSince: null, retry: null };
+      var rec = { el: el, cam: cam, img: el.querySelector(".feed"), failSince: null, retry: null, nextFrame: null };
       cards[cam.id] = rec;
 
       // toolbar actions
@@ -862,25 +942,151 @@
       return rec;
     }
 
+    function buildGhostCard(slotNumber) {
+      var ghost = makeGhostSlot(slotNumber);
+      var el = document.createElement("article");
+      el.className = "cam ghost-slot";
+      el.dataset.id = ghost.id;
+      el.dataset.state = "offline";
+
+      el.innerHTML =
+        '<div class="screen">' +
+          '<div class="demo"></div>' +
+          '<div class="noise"></div>' +
+          '<div class="scan"></div>' +
+          '<div class="hud"><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>' +
+          '<div class="center-msg"><div class="big">EMPTY SLOT</div><div class="small">Menunggu kamera baru</div></div>' +
+          '<div class="ov top">' +
+            '<span class="cam-tag">SLOT ' + slotNumber + '</span>' +
+            '<span class="badge"><i class="dot"></i> <span class="badge-text">OFFLINE</span></span>' +
+          '</div>' +
+          '<div class="ov bottom">' +
+            '<div class="meta"><div class="name">' + esc(ghost.name) + '</div><div class="sub">' + esc(ghost.ip) + '</div></div>' +
+            '<span class="clock-ov">--:--:--</span>' +
+          '</div>' +
+        '</div>';
+
+      grid.appendChild(el);
+      cards[ghost.id] = { el: el, cam: ghost, img: null, failSince: null, retry: null, nextFrame: null };
+      return cards[ghost.id];
+    }
+
+    function hasModeProfiles(cam) {
+      return !!(
+        cam &&
+        !cam.demo &&
+        (
+          (cam.profiles && (cam.profiles.fast || cam.profiles.sharp)) ||
+          (cam.streamPath && cam.latestPath)
+        )
+      );
+    }
+    function profileForMode(cam, requestedMode) {
+      if (!cam || !cam.profiles) return null;
+      if (requestedMode && cam.profiles[requestedMode]) return cam.profiles[requestedMode];
+      if (cam.profiles.default) return cam.profiles.default;
+      if (cam.profiles.fast) return cam.profiles.fast;
+      if (cam.profiles.sharp) return cam.profiles.sharp;
+      var keys = Object.keys(cam.profiles);
+      return keys.length ? cam.profiles[keys[0]] : null;
+    }
+    function streamPathForMode(cam, requestedMode) {
+      var profile = profileForMode(cam, requestedMode);
+      return (profile && profile.streamPath) || cam.streamPath || "";
+    }
+    function latestPathForMode(cam, requestedMode) {
+      var profile = profileForMode(cam, requestedMode);
+      return (profile && profile.latestPath) || cam.latestPath || "";
+    }
+    function activeFeedMode() {
+      return normalizeFeedMode(settings.feedMode);
+    }
+    function nextFrameDelayMs() {
+      return activeFeedMode() === "sharp" ? 550 : 800;
+    }
+
     function setState(id, state) {
       var rec = cards[id]; if (!rec) return;
       rec.el.dataset.state = state;
       var bt = rec.el.querySelector(".badge-text");
-      if (bt) bt.textContent = { live: "LIVE", connecting: "RECONNECTING", offline: "OFFLINE", demo: "DEMO" }[state] || state.toUpperCase();
+      if (bt) {
+        var label = { live: "LIVE", connecting: "RECONNECTING", offline: "OFFLINE", demo: "DEMO" }[state] || state.toUpperCase();
+        if (state !== "demo" && hasModeProfiles(rec.cam)) {
+          label += " " + activeFeedMode().toUpperCase();
+        }
+        bt.textContent = label;
+      }
     }
 
-    function streamUrl(cam) { return cam.streamPath + "?ts=" + Date.now(); }
+    function streamUrl(cam, requestedMode) {
+      var path = streamPathForMode(cam, requestedMode);
+      return path ? path + "?ts=" + Date.now() : "";
+    }
+    function latestUrl(cam, requestedMode) {
+      var path = latestPathForMode(cam, requestedMode);
+      return path ? path + "?ts=" + Date.now() : "";
+    }
+    function prefersFastFeed(cam) {
+      return activeFeedMode() === "fast" && !!streamPathForMode(cam, "fast");
+    }
+    function feedUrl(cam) {
+      if (prefersFastFeed(cam)) {
+        return streamUrl(cam, "fast") || latestUrl(cam, "fast") || streamUrl(cam) || latestUrl(cam);
+      }
+      return latestUrl(cam, "sharp") || latestUrl(cam) || streamUrl(cam, "sharp") || streamUrl(cam);
+    }
+
+    function stopFeedTimers(id) {
+      var rec = cards[id]; if (!rec) return;
+      if (rec.retry) { clearTimeout(rec.retry); rec.retry = null; }
+      if (rec.nextFrame) { clearTimeout(rec.nextFrame); rec.nextFrame = null; }
+    }
+
+    function requestFrame(id) {
+      var rec = cards[id]; if (!rec || !rec.img) return;
+      var url = feedUrl(rec.cam);
+      if (!url) return;
+      rec.img.src = url;
+    }
+
+    function scheduleNextFrame(id) {
+      var rec = cards[id]; if (!rec || !rec.img) return;
+      if (prefersFastFeed(rec.cam)) return;
+      if (rec.nextFrame) clearTimeout(rec.nextFrame);
+      rec.nextFrame = setTimeout(function () {
+        requestFrame(id);
+      }, nextFrameDelayMs());
+    }
 
     function startStream(id) {
       var rec = cards[id]; if (!rec || !rec.img) return;
       var img = rec.img, cam = rec.cam;
+      stopFeedTimers(id);
 
       img.onload = function () {
         rec.failSince = null;
         setState(id, "live");
+        if (!prefersFastFeed(cam)) {
+          scheduleNextFrame(id);
+        }
       };
       img.onerror = function () { scheduleRetry(id); };
-      img.src = streamUrl(cam);
+      if (cam.latestPath || cam.streamPath) {
+        requestFrame(id);
+      }
+    }
+
+    function refreshAllFeeds() {
+      cameras.forEach(function (cam) {
+        if (!cam.demo && (cam.streamPath || cam.latestPath) && cards[cam.id]) {
+          startStream(cam.id);
+          setState(cam.id, cards[cam.id].el.dataset.state || "connecting");
+        }
+      });
+
+      if (spotState.open) {
+        showSpot(spotState.index);
+      }
     }
 
     function scheduleRetry(id) {
@@ -889,8 +1095,9 @@
       var down = Date.now() - rec.failSince;
       setState(id, down > 15000 ? "offline" : "connecting");
       if (rec.retry) clearTimeout(rec.retry);
+      if (rec.nextFrame) clearTimeout(rec.nextFrame);
       rec.retry = setTimeout(function () {
-        if (rec.img) rec.img.src = streamUrl(rec.cam);
+        if (rec.img) requestFrame(id);
       }, Math.max(1, settings.reconnect) * 1000);
     }
 
@@ -910,22 +1117,62 @@
               on++;
               var rec = cards[cam.id];
               if (rec && rec.el.dataset.state !== "live") {
-                // backend says fresh; nudge the image to load
                 rec.failSince = null;
+                requestFrame(cam.id);
+                setState(cam.id, "connecting");
               }
             } else if (cards[cam.id]) {
               scheduleRetry(cam.id);
             }
           });
           onlineCountEl.textContent = on;
+          updateLoadStats(p);
         })
+        .catch(function () {});
+    }
+
+    function updateLoadStats(payload) {
+      if (payload && typeof payload.viewerCount === "number") viewerCountEl.textContent = payload.viewerCount;
+      if (payload && typeof payload.activeStreams === "number") streamCountEl.textContent = payload.activeStreams;
+    }
+
+    function sendHeartbeat() {
+      if (demoMode) return;
+      fetch("/api/heartbeat?sid=" + encodeURIComponent(viewerSessionId), { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(updateLoadStats)
         .catch(function () {});
     }
 
     function updateCounts() {
       var visible = cameras.filter(function (c) { return !c.hidden; });
-      totalCountEl.textContent = visible.length;
+      totalCountEl.textContent = Math.max(visible.length, configuredFeedSlots());
       if (demoMode) onlineCountEl.textContent = visible.length;
+    }
+
+    function requestFullscreenFor(targetEl) {
+      if (!targetEl || !targetEl.requestFullscreen) return Promise.resolve();
+      return targetEl.requestFullscreen().catch(function () {});
+    }
+
+    function exitFullscreenSafe() {
+      if (!document.fullscreenElement || !document.exitFullscreen) return Promise.resolve();
+      return document.exitFullscreen().catch(function () {});
+    }
+
+    function toggleFullscreenFor(targetEl) {
+      if (!targetEl) return Promise.resolve();
+      if (document.fullscreenElement === targetEl) {
+        return exitFullscreenSafe();
+      }
+
+      if (document.fullscreenElement) {
+        return exitFullscreenSafe().then(function () {
+          return requestFullscreenFor(targetEl);
+        });
+      }
+
+      return requestFullscreenFor(targetEl);
     }
 
     // ----------------------------------------------------------
@@ -934,7 +1181,13 @@
     function handleAction(act, id) {
       var cam = byId(id);
       if (act === "spotlight" || act === "expand") {
-        if (act === "expand") { var rec = cards[id]; if (rec && rec.el.requestFullscreen) { rec.el.requestFullscreen().catch(function(){}); return; } }
+        if (act === "expand") {
+          var rec = cards[id];
+          if (rec && rec.el) {
+            toggleFullscreenFor(rec.el);
+            return;
+          }
+        }
         openSpotlight(id);
       } else if (act === "snap") {
         snapshot(cam);
@@ -945,15 +1198,17 @@
       } else if (act === "rename") {
         startRename(id);
       } else if (act === "raw") {
-        if (cam.streamPath) window.open(cam.streamPath, "_blank", "noopener");
+        var rawPath = streamPathForMode(cam, activeFeedMode()) || streamPathForMode(cam, "fast") || cam.streamPath;
+        if (rawPath) window.open(rawPath, "_blank", "noopener");
         else toast("Stream mentah hanya tersedia saat bridge aktif");
       }
     }
 
     function snapshot(cam) {
-      if (!cam.latestPath) { toast("Snapshot butuh bridge aktif"); return; }
+      var snapPath = latestPathForMode(cam, activeFeedMode()) || latestPathForMode(cam, "sharp") || cam.latestPath;
+      if (!snapPath) { toast("Snapshot butuh bridge aktif"); return; }
       var a = document.createElement("a");
-      a.href = cam.latestPath + "?ts=" + Date.now();
+      a.href = snapPath + "?ts=" + Date.now();
       a.download = (cam.name || "camera").replace(/\s+/g, "_") + "_" + Date.now() + ".jpg";
       document.body.appendChild(a); a.click(); a.remove();
     }
@@ -1011,7 +1266,7 @@
     // ----------------------------------------------------------
     // Spotlight / slideshow
     // ----------------------------------------------------------
-    var spotState = { open: false, index: 0, playing: false, timer: null, list: [] };
+    var spotState = { open: false, index: 0, playing: false, timer: null, frameTimer: null, list: [] };
     var spot = document.getElementById("spotlight");
     var spotImg = document.getElementById("spotImg");
     var spotName = document.getElementById("spotName");
@@ -1033,7 +1288,9 @@
     }
     function closeSpotlight() {
       spotState.open = false; spot.classList.remove("show");
-      stopSlideshow(); spotImg.src = "";
+      stopSlideshow();
+      stopSpotFrameLoop();
+      spotImg.src = "";
     }
     function renderDots() {
       spotDots.innerHTML = "";
@@ -1043,6 +1300,25 @@
         spotDots.appendChild(d);
       });
     }
+    function stopSpotFrameLoop() {
+      if (spotState.frameTimer) {
+        clearTimeout(spotState.frameTimer);
+        spotState.frameTimer = null;
+      }
+    }
+    function scheduleSpotFrameLoop() {
+      stopSpotFrameLoop();
+      if (!spotState.open) return;
+      var cam = spotState.list[spotState.index];
+      if (!cam || prefersFastFeed(cam) || !latestPathForMode(cam, "sharp")) return;
+      spotState.frameTimer = setTimeout(function () {
+        if (!spotState.open) return;
+        var current = spotState.list[spotState.index];
+        if (!current || prefersFastFeed(current) || !latestPathForMode(current, "sharp")) return;
+        spotImg.src = latestUrl(current, "sharp");
+        scheduleSpotFrameLoop();
+      }, nextFrameDelayMs());
+    }
     function showSpot(i) {
       var list = spotState.list;
       spotState.index = (i + list.length) % list.length;
@@ -1051,8 +1327,19 @@
       spotSub.textContent = (cam.zone ? cam.zone + " · " : "") + "CAM " + cam.id + " · " + cam.ip;
       var bt = spotBadge.querySelector("span");
       if (cam.demo) { bt.textContent = "DEMO"; spotBadge.style.color = "var(--accent)"; }
-      else { bt.textContent = "LIVE"; spotBadge.style.color = "var(--live)"; }
-      if (cam.streamPath) spotImg.src = streamUrl(cam);
+      else {
+        bt.textContent = hasModeProfiles(cam) ? ("LIVE " + activeFeedMode().toUpperCase()) : "LIVE";
+        spotBadge.style.color = "var(--live)";
+      }
+      stopSpotFrameLoop();
+      if (prefersFastFeed(cam) && streamPathForMode(cam, "fast")) {
+        spotImg.src = streamUrl(cam, "fast");
+      }
+      else if (latestPathForMode(cam, "sharp")) {
+        spotImg.src = latestUrl(cam, "sharp");
+        scheduleSpotFrameLoop();
+      }
+      else if (streamPathForMode(cam)) spotImg.src = streamUrl(cam);
       else spotImg.removeAttribute("src");
       Array.prototype.forEach.call(spotDots.children, function (d, j) { d.classList.toggle("active", j === spotState.index); });
     }
@@ -1080,9 +1367,10 @@
     searchEl.addEventListener("input", function () {
       var q = searchEl.value.trim().toLowerCase();
       var shown = 0;
-      cameras.forEach(function (cam) {
-        var rec = cards[cam.id]; if (!rec) return;
-        var hay = (cam.name + " " + cam.zone + " " + cam.ip + " cam" + cam.id).toLowerCase();
+      Object.keys(cards).forEach(function (id) {
+        var rec = cards[id]; if (!rec) return;
+        var cam = rec.cam;
+        var hay = (cam.name + " " + (cam.zone || "") + " " + cam.ip + " cam" + cam.id + (cam.ghost ? " empty slot offline" : "")).toLowerCase();
         var match = !cam.hidden && (!q || hay.indexOf(q) >= 0);
         rec.el.style.display = match ? "" : "none";
         if (match) shown++;
@@ -1126,6 +1414,7 @@
     // bind simple inputs
     var setBrand = document.getElementById("setBrand");
     var setCols = document.getElementById("setCols");
+    var setFeedSlots = document.getElementById("setFeedSlots");
     var setReconnect = document.getElementById("setReconnect");
     var setSlideshow = document.getElementById("setSlideshow");
     var tHud = document.getElementById("tHud");
@@ -1136,15 +1425,23 @@
     function pushSettingsToForm() {
       setBrand.value = settings.brand;
       setCols.value = settings.cols;
+      setFeedSlots.value = String(clampNum(settings.feedSlots, 2, 8, 4));
       setReconnect.value = settings.reconnect;
       setSlideshow.value = settings.slideshow;
       tHud.checked = settings.hud; tScan.checked = settings.scan; tInfo.checked = settings.info; tClock.checked = settings.clock;
       syncSwatches();
     }
-    function commitSettings() { save(SETTINGS_KEY, settings); applySettings(); }
+    function commitSettings() { save(SETTINGS_KEY, settings); applySettings(); updateCounts(); }
 
-    setBrand.addEventListener("input", function () { settings.brand = setBrand.value || "BARDI"; commitSettings(); });
+    setBrand.addEventListener("input", function () { settings.brand = setBrand.value || "CCTV_HACK"; commitSettings(); });
     setCols.addEventListener("change", function () { settings.cols = setCols.value; commitSettings(); });
+    setFeedSlots.addEventListener("change", function () {
+      settings.feedSlots = clampNum(setFeedSlots.value, 2, 8, 4);
+      setFeedSlots.value = String(settings.feedSlots);
+      commitSettings();
+      rebuildGrid();
+      searchEl.dispatchEvent(new Event("input"));
+    });
     setReconnect.addEventListener("change", function () { settings.reconnect = clampNum(setReconnect.value, 1, 60, 3); setReconnect.value = settings.reconnect; commitSettings(); });
     setSlideshow.addEventListener("change", function () { settings.slideshow = clampNum(setSlideshow.value, 2, 120, 6); setSlideshow.value = settings.slideshow; commitSettings(); if (spotState.playing) startSlideshow(); });
     tHud.addEventListener("change", function () { settings.hud = tHud.checked; commitSettings(); });
@@ -1216,12 +1513,18 @@
     // ----------------------------------------------------------
     function rebuildGrid() {
       // clear timers
-      Object.keys(cards).forEach(function (id) { if (cards[id].retry) clearTimeout(cards[id].retry); });
+      Object.keys(cards).forEach(function (id) {
+        if (cards[id].retry) clearTimeout(cards[id].retry);
+        if (cards[id].nextFrame) clearTimeout(cards[id].nextFrame);
+      });
       grid.innerHTML = ""; cards = {};
       var visible = cameras.filter(function (c) { return !c.hidden; });
       visible.forEach(buildCard);
+      for (var slot = visible.length + 1; slot <= configuredFeedSlots(); slot++) {
+        buildGhostCard(slot);
+      }
       updateCounts();
-      empty.classList.toggle("show", visible.length === 0);
+      empty.classList.toggle("show", Object.keys(cards).length === 0);
       if (visible.length === 0) { emptyTitle.textContent = "Belum ada kamera tampil"; emptyMsg.textContent = demoMode ? "Bridge lokal tidak terdeteksi — menampilkan mode pratinjau." : "Periksa apakah bridge lokal sedang berjalan."; }
       tickClock();
     }
@@ -1230,8 +1533,7 @@
     // Fullscreen
     // ----------------------------------------------------------
     document.getElementById("fsBtn").addEventListener("click", function () {
-      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function () {});
-      else document.exitFullscreen();
+      toggleFullscreenFor(document.documentElement);
     });
 
     // ----------------------------------------------------------
@@ -1257,6 +1559,16 @@
       settings.cols = b.dataset.cols; commitSettings(); setCols.value = settings.cols;
     });
 
+    document.getElementById("modeSeg").addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      var nextMode = normalizeFeedMode(b.dataset.feedMode);
+      if (nextMode === normalizeFeedMode(settings.feedMode)) return;
+      settings.feedMode = nextMode;
+      commitSettings();
+      refreshAllFeeds();
+      toast(nextMode === "fast" ? "Mode FAST aktif" : "Mode SHARP aktif");
+    });
+
     // ----------------------------------------------------------
     // Init
     // ----------------------------------------------------------
@@ -1268,7 +1580,12 @@
         cameras = raw.map(mergedCamera);
         rebuildGrid();
         renderCamEditList();
-        if (!demoMode) { pollStatus(); setInterval(pollStatus, 4000); }
+        if (!demoMode) {
+          sendHeartbeat();
+          pollStatus();
+          setInterval(sendHeartbeat, 10000);
+          setInterval(pollStatus, 4000);
+        }
         else toast("Mode pratinjau — bridge lokal tidak aktif");
       });
     }

@@ -14,3 +14,7 @@ Local dashboard untuk menampilkan dua kamera Bardi di browser melalui bridge lok
 
 - Kamera browser-facing disajikan lewat endpoint lokal, bukan RTSP langsung.
 - `CLAUDE-HANDOFF.md` sengaja membatasi Claude ke desain frontend saja.
+
+## Ecosystem
+
+Part of the [Telemetric Hardware Portal](https://github.com/TaufikAS0/telemetric-hardware-portal) ecosystem. Firmware artifacts are published to the [Telemetric Firmware Library](https://github.com/TaufikAS0/telemetric-firmware-library). Registry and coordination: [obsidian-portal-hardware](https://github.com/TaufikAS0/obsidian-portal-hardware).

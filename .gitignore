@@ -1,3 +1,5 @@
 .state/
 *.pid
 *.log
+__pycache__/
+*.pyc

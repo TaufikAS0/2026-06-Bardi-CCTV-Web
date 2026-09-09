@@ -1,402 +1,1597 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bardi CCTV Local View</title>
+  <meta name="theme-color" content="#05080d">
+  <title>CCTV_HACK · Ghost Grid</title>
   <style>
+    /* ============================================================
+       CCTV_HACK GHOST GRID — futuristic CCTV control deck
+       Single-file UI. Themeable. Settings persist in localStorage.
+       ============================================================ */
+
     :root {
-      color-scheme: light;
-      --bg: #f3f6ef;
-      --panel: #fbf8f1;
-      --ink: #1f2b1f;
-      --accent: #14532d;
-      --muted: #5d6b5d;
-      --edge: #d7dece;
+      color-scheme: dark;
+      --accent: #22d3ee;
+      --accent-rgb: 34, 211, 238;
+
+      --bg-0: #04070c;
+      --bg-1: #070b12;
+      --panel: rgba(12, 19, 28, 0.72);
+      --panel-solid: #0b121b;
+      --line: rgba(120, 190, 220, 0.12);
+      --line-strong: rgba(120, 190, 220, 0.28);
+      --ink: #dbe9f1;
+      --ink-dim: #93a7b6;
+      --muted: #5f7585;
+
+      --live: #2ee6a6;
+      --live-rgb: 46, 230, 166;
+      --warn: #f5b942;
+      --danger: #ff5d72;
+
+      --radius: 16px;
+      --radius-sm: 11px;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      --mono: "JetBrains Mono", "Cascadia Code", Consolas, "SFMono-Regular", monospace;
+      --sans: "Inter", "Segoe UI", Tahoma, system-ui, sans-serif;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
 
     body {
       margin: 0;
-      min-height: 100vh;
-      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background:
-        radial-gradient(circle at top left, #d7ead7 0, transparent 30%),
-        linear-gradient(160deg, #eef6e8 0%, var(--bg) 48%, #edf0e2 100%);
+      font-family: var(--sans);
       color: var(--ink);
+      background: var(--bg-0);
+      background-image:
+        radial-gradient(900px 600px at 12% -10%, rgba(var(--accent-rgb), 0.10), transparent 60%),
+        radial-gradient(1100px 700px at 110% 0%, rgba(120, 90, 255, 0.07), transparent 55%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-0));
+      overflow-x: hidden;
     }
 
-    main {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 24px;
+    /* faint engineering grid */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(circle at 50% 0%, #000 0%, transparent 80%);
+      opacity: 0.5;
+      z-index: 0;
     }
 
-    .hero {
-      display: grid;
-      gap: 18px;
-      margin-bottom: 20px;
-    }
+    .app { position: relative; z-index: 1; min-height: 100%; display: flex; flex-direction: column; }
 
-    .hero h1 {
-      margin: 0;
-      font-size: clamp(2rem, 4vw, 3.4rem);
-      line-height: 1;
-      letter-spacing: -0.04em;
-    }
-
-    .hero p {
-      margin: 0;
-      max-width: 60ch;
-      color: var(--muted);
-      font-size: 1rem;
-    }
-
-    .layout {
-      display: grid;
-      gap: 18px;
-      grid-template-columns: minmax(0, 2.5fr) minmax(280px, 1fr);
-    }
-
-    .panel {
-      background: rgba(251, 248, 241, 0.92);
-      border: 1px solid var(--edge);
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(43, 57, 43, 0.08);
-      overflow: hidden;
-    }
-
-    .feed-grid {
-      display: grid;
-      gap: 18px;
-      padding: 18px;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    }
-
-    .camera-card {
-      border: 1px solid var(--edge);
-      border-radius: 18px;
-      background: rgba(245, 246, 238, 0.9);
-      overflow: hidden;
-    }
-
-    .camera-head {
+    /* ---------- Top bar ---------- */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
       display: flex;
-      justify-content: space-between;
-      gap: 12px;
       align-items: center;
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--edge);
+      gap: 18px;
+      padding: 14px 22px;
+      background: linear-gradient(180deg, rgba(6, 10, 16, 0.92), rgba(6, 10, 16, 0.62));
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
     }
 
-    .camera-head h2 {
-      margin: 0;
-      font-size: 1rem;
+    .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+
+    .scope {
+      width: 42px; height: 42px; flex: none;
+      border-radius: 12px;
+      border: 1px solid rgba(var(--accent-rgb), 0.35);
+      background: radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.18), rgba(var(--accent-rgb), 0.02) 70%);
+      position: relative; overflow: hidden;
+      box-shadow: inset 0 0 18px rgba(var(--accent-rgb), 0.18);
+    }
+    .scope::before, .scope::after {
+      content: ""; position: absolute; inset: 0; margin: auto;
+    }
+    .scope::before {
+      width: 1px; height: 100%;
+      background: rgba(var(--accent-rgb), 0.25);
+      box-shadow: 0 0 0 999px transparent;
+    }
+    .scope .ring { position: absolute; inset: 7px; border: 1px solid rgba(var(--accent-rgb), 0.30); border-radius: 50%; }
+    .scope .ring.inner { inset: 13px; opacity: 0.6; }
+    .scope .sweep {
+      position: absolute; inset: 0;
+      background: conic-gradient(from 0deg, rgba(var(--accent-rgb), 0.55), transparent 90deg);
+      animation: sweep 3.2s linear infinite;
+      border-radius: 50%;
+    }
+    @keyframes sweep { to { transform: rotate(360deg); } }
+
+    .brand-text { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+    .brand-name {
+      font-weight: 800; letter-spacing: 0.16em; font-size: 1.02rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .brand-sub {
+      font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.34em;
+      color: var(--accent); text-transform: uppercase; margin-top: 3px;
     }
 
-    .camera-head p {
-      margin: 4px 0 0;
-      color: var(--muted);
-      font-size: 0.88rem;
+    .top-stats { display: flex; align-items: center; gap: 10px; margin-left: 6px; }
+    .stat {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 7px 13px; border-radius: 11px;
+      border: 1px solid var(--line); background: var(--panel);
+      font-family: var(--mono);
     }
+    .stat .k { font-size: 0.56rem; letter-spacing: 0.22em; color: var(--muted); text-transform: uppercase; }
+    .stat .v { font-size: 0.92rem; font-weight: 600; color: var(--ink); }
+    .stat .v .on { color: var(--live); }
 
-    .viewer {
+    .spacer { flex: 1 1 auto; }
+
+    .search {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 12px; height: 38px;
+      border: 1px solid var(--line); border-radius: 999px;
+      background: var(--panel); width: 200px; transition: border-color .2s, box-shadow .2s, width .2s;
+    }
+    .search:focus-within { border-color: rgba(var(--accent-rgb), 0.5); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12); width: 240px; }
+    .search svg { width: 15px; height: 15px; color: var(--muted); flex: none; }
+    .search input {
+      border: 0; background: transparent; color: var(--ink); outline: none;
+      font-family: var(--mono); font-size: 0.82rem; width: 100%;
+    }
+    .search input::placeholder { color: var(--muted); }
+
+    .seg {
+      display: flex; padding: 4px; gap: 3px;
+      border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
+    }
+    .seg button {
+      border: 0; background: transparent; color: var(--ink-dim);
+      width: 34px; height: 30px; border-radius: 8px; cursor: pointer;
+      font-family: var(--mono); font-size: 0.8rem; font-weight: 600;
+      display: grid; place-items: center; transition: background .15s, color .15s;
+    }
+    .seg button:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+    .seg button.active { color: #04070c; background: var(--accent); box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.45); }
+    #modeSeg button { width: auto; min-width: 58px; padding: 0 10px; }
+
+    .iconbtn {
+      width: 40px; height: 40px; flex: none;
+      display: grid; place-items: center;
+      border: 1px solid var(--line); border-radius: 12px;
+      background: var(--panel); color: var(--ink-dim);
+      cursor: pointer; transition: color .15s, border-color .15s, background .15s, box-shadow .15s;
+    }
+    .iconbtn:hover { color: var(--ink); border-color: var(--line-strong); background: rgba(255,255,255,0.04); }
+    .iconbtn.accent { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.35); }
+    .iconbtn.accent:hover { box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.30); }
+    .iconbtn.live-on { color: #04070c; background: var(--accent); border-color: var(--accent); box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.45); }
+    .iconbtn svg { width: 18px; height: 18px; }
+
+    .top-actions { display: flex; align-items: center; gap: 9px; }
+
+    /* ---------- Camera grid ---------- */
+    main.deck { flex: 1; padding: 22px; }
+
+    .cam-grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(var(--cols, auto), minmax(0, 1fr));
+    }
+    .cam-grid[data-cols="auto"] { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+
+    .cam {
       position: relative;
-      background: #101514;
-      aspect-ratio: 16 / 9;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--panel);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      transition: transform .2s, border-color .2s, box-shadow .2s;
+      animation: rise .35s ease both;
     }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+    .cam:hover { transform: translateY(-3px); border-color: rgba(var(--accent-rgb), 0.4); box-shadow: 0 28px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(var(--accent-rgb), 0.12); }
+    .cam.ghost-slot { border-style: dashed; opacity: 0.9; }
+    .cam.ghost-slot .demo { filter: grayscale(1) brightness(0.38); animation: none; }
 
-    .viewer img {
-      display: block;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: #111;
+    .screen {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #04070b;
+      overflow: hidden;
+    }
+    .screen .feed,
+    .screen .demo {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      transition: transform .25s, opacity .3s;
+    }
+    .cam.flip .feed, .cam.flip .demo { transform: scaleX(-1); }
+    .cam.flip.zoom .feed { transform: scaleX(-1) scale(1.0); }
+
+    /* simulated moving feed for demo / preview */
+    .demo {
+      background:
+        linear-gradient(115deg, rgba(var(--accent-rgb),0.10), transparent 40%),
+        repeating-linear-gradient(120deg, rgba(255,255,255,0.018) 0 12px, transparent 12px 26px),
+        radial-gradient(120% 90% at 30% 20%, #122231, #060b12 70%);
+      background-size: 200% 200%, auto, auto;
+      animation: drift 14s ease-in-out infinite alternate;
+    }
+    @keyframes drift { to { background-position: 100% 100%, 0 0, 0 0; } }
+
+    /* noise / no-signal static */
+    .noise {
+      position: absolute; inset: 0; pointer-events: none; opacity: 0;
+      transition: opacity .3s;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      mix-blend-mode: screen;
+      animation: jump .4s steps(3) infinite;
+    }
+    @keyframes jump { to { background-position: 30px 20px; } }
+
+    /* scanline sweep */
+    .scan {
+      position: absolute; inset: 0; pointer-events: none; opacity: 0.5;
+      background: linear-gradient(rgba(var(--accent-rgb),0.0), rgba(var(--accent-rgb),0.05) 50%, rgba(var(--accent-rgb),0.0));
+      background-size: 100% 6px;
+      mix-blend-mode: overlay;
+    }
+    .scan::after {
+      content: ""; position: absolute; left: 0; right: 0; height: 26%;
+      background: linear-gradient(rgba(var(--accent-rgb),0), rgba(var(--accent-rgb),0.12), rgba(var(--accent-rgb),0));
+      animation: scanmove 5.5s linear infinite;
+    }
+    @keyframes scanmove { from { top: -30%; } to { top: 110%; } }
+    body.no-scan .scan { display: none; }
+
+    /* HUD corner brackets */
+    .hud span {
+      position: absolute; width: 16px; height: 16px;
+      border: 2px solid rgba(var(--accent-rgb), 0.65);
+    }
+    .hud .tl { top: 10px; left: 10px; border-right: 0; border-bottom: 0; }
+    .hud .tr { top: 10px; right: 10px; border-left: 0; border-bottom: 0; }
+    .hud .bl { bottom: 10px; left: 10px; border-right: 0; border-top: 0; }
+    .hud .br { bottom: 10px; right: 10px; border-left: 0; border-top: 0; }
+    body.no-hud .hud { display: none; }
+
+    /* overlays */
+    .ov { position: absolute; left: 0; right: 0; display: flex; align-items: center; gap: 10px; padding: 12px; pointer-events: none; }
+    .ov.top { top: 0; justify-content: space-between; background: linear-gradient(180deg, rgba(3,6,10,0.7), transparent); }
+    .ov.bottom { bottom: 0; justify-content: space-between; align-items: flex-end; background: linear-gradient(0deg, rgba(3,6,10,0.78), transparent); }
+    body.no-info .ov.top .cam-tag,
+    body.no-info .ov.bottom .meta { opacity: 0; }
+
+    .cam-tag {
+      font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.2em;
+      color: var(--ink-dim); background: rgba(4,8,12,0.55);
+      padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line);
+      text-transform: uppercase;
     }
 
     .badge {
-      position: absolute;
-      top: 14px;
-      left: 14px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(9, 15, 12, 0.72);
-      color: #f7fff8;
-      font-size: 0.88rem;
-      backdrop-filter: blur(10px);
+      display: inline-flex; align-items: center; gap: 7px;
+      font-family: var(--mono); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.16em;
+      padding: 5px 11px; border-radius: 999px; text-transform: uppercase;
+      border: 1px solid transparent; background: rgba(4,8,12,0.6);
     }
+    .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 0 currentColor; }
+    .cam[data-state="live"] .badge { color: var(--live); border-color: rgba(var(--live-rgb), 0.4); }
+    .cam[data-state="live"] .badge .dot { animation: pulse 1.6s ease-out infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(var(--live-rgb), 0.6); } 100% { box-shadow: 0 0 0 9px rgba(var(--live-rgb), 0); } }
+    .cam[data-state="connecting"] .badge { color: var(--warn); border-color: rgba(245,185,66,0.4); }
+    .cam[data-state="connecting"] .badge .dot { animation: blink 1s steps(2) infinite; }
+    .cam[data-state="offline"] .badge,
+    .cam[data-state="demo"] .badge { color: var(--danger); border-color: rgba(255,93,114,0.4); }
+    @keyframes blink { 50% { opacity: 0.25; } }
+    .cam[data-state="demo"] .badge { color: var(--accent); border-color: rgba(var(--accent-rgb),0.4); }
 
-    .sidebar {
-      padding: 20px;
-      display: grid;
-      gap: 16px;
-      align-content: start;
+    .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .meta .name { font-size: 0.95rem; font-weight: 700; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .meta .name input {
+      font: inherit; font-weight: 700; color: #fff; background: rgba(4,8,12,0.85);
+      border: 1px solid rgba(var(--accent-rgb),0.6); border-radius: 6px; padding: 2px 6px; outline: none; width: 180px;
     }
+    .meta .sub { font-family: var(--mono); font-size: 0.62rem; color: var(--ink-dim); letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .clock-ov { font-family: var(--mono); font-size: 0.66rem; color: var(--ink-dim); background: rgba(4,8,12,0.55); padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line); }
+    body.no-clock .clock-ov { display: none; }
 
-    .sidebar h2 {
-      margin: 0;
-      font-size: 1rem;
+    /* big NO SIGNAL center text */
+    .center-msg {
+      position: absolute; inset: 0; display: none; place-items: center; pointer-events: none;
+      flex-direction: column; gap: 8px; text-align: center;
     }
+    .center-msg .big { font-family: var(--mono); font-size: 0.95rem; letter-spacing: 0.4em; color: var(--danger); text-transform: uppercase; }
+    .center-msg .small { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.2em; color: var(--muted); }
+    .cam[data-state="offline"] .center-msg { display: grid; }
+    .cam[data-state="offline"] .noise { opacity: 0.20; }
+    .cam[data-state="demo"] .center-msg { display: grid; }
+    .cam[data-state="demo"] .center-msg .big { color: var(--accent); }
+    .cam[data-state="connecting"] .center-msg { display: grid; }
+    .cam[data-state="connecting"] .center-msg .big { color: var(--warn); font-size: 0.8rem; }
+    .cam[data-state="live"] .feed { opacity: 1; }
+    .cam:not([data-state="live"]) .feed { opacity: 0; }
 
-    .sidebar p,
-    .sidebar li,
-    .sidebar code {
-      color: var(--muted);
-      font-size: 0.95rem;
+    /* hover toolbar */
+    .toolbar {
+      position: absolute; bottom: 46px; right: 12px;
+      display: flex; gap: 6px; padding: 6px; border-radius: 12px;
+      background: rgba(4,8,12,0.78); border: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+      opacity: 0; transform: translateY(6px); transition: opacity .18s, transform .18s;
+      pointer-events: none;
     }
-
-    .sidebar ul {
-      margin: 0;
-      padding-left: 18px;
+    .cam:hover .toolbar, .cam:focus-within .toolbar { opacity: 1; transform: none; pointer-events: auto; }
+    .toolbar button {
+      width: 32px; height: 32px; border-radius: 8px; border: 0; cursor: pointer;
+      background: transparent; color: var(--ink-dim); display: grid; place-items: center;
+      transition: background .15s, color .15s;
     }
+    .toolbar button:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.12); }
+    .toolbar button svg { width: 16px; height: 16px; }
 
-    .field {
-      display: grid;
-      gap: 8px;
+    /* ---------- Empty state ---------- */
+    .empty {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      gap: 14px; padding: 80px 20px; text-align: center; color: var(--muted);
     }
+    .empty.show { display: flex; }
+    .empty svg { width: 56px; height: 56px; color: var(--line-strong); }
+    .empty h2 { margin: 0; color: var(--ink-dim); font-size: 1.1rem; font-weight: 600; }
+    .empty p { margin: 0; font-family: var(--mono); font-size: 0.78rem; max-width: 46ch; }
 
-    .value {
-      display: block;
-      padding: 12px 14px;
-      border-radius: 14px;
-      background: #f2f5ec;
-      border: 1px solid var(--edge);
-      word-break: break-all;
-      color: #294129;
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 0.9rem;
+    /* ---------- Spotlight / slideshow ---------- */
+    .spotlight {
+      position: fixed; inset: 0; z-index: 60; display: none;
+      background: rgba(2,4,8,0.94); backdrop-filter: blur(8px);
+      flex-direction: column;
     }
+    .spotlight.show { display: flex; animation: rise .25s ease; }
+    .spot-head { display: flex; align-items: center; gap: 14px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+    .spot-head .meta .name { font-size: 1.05rem; }
+    .spot-body { flex: 1; position: relative; display: grid; place-items: center; padding: 16px; overflow: hidden; }
+    .spot-screen { position: relative; width: min(100%, calc((100vh - 170px) * 16 / 9)); aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; border: 1px solid var(--line-strong); background: #04070b; box-shadow: var(--shadow); }
+    .spot-screen img { width: 100%; height: 100%; object-fit: contain; display: block; background: #04070b; }
+    .spot-screen .scan, .spot-screen .hud span { }
+    .spot-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+    .spot-nav:hover { border-color: rgba(var(--accent-rgb),0.5); color: var(--accent); }
+    .spot-nav.prev { left: 24px; } .spot-nav.next { right: 24px; }
+    .spot-foot { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; }
+    .dots { display: flex; gap: 7px; }
+    .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); cursor: pointer; transition: background .15s, transform .15s; }
+    .dots i.active { background: var(--accent); transform: scale(1.25); box-shadow: 0 0 10px rgba(var(--accent-rgb),0.6); }
 
-    .actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
+    /* ---------- Drawer (settings) ---------- */
+    .scrim { position: fixed; inset: 0; background: rgba(2,4,8,0.6); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 70; }
+    .scrim.show { opacity: 1; pointer-events: auto; }
+    .drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 92vw); z-index: 80;
+      background: var(--panel-solid); border-left: 1px solid var(--line-strong);
+      transform: translateX(100%); transition: transform .28s cubic-bezier(.22,.61,.36,1);
+      display: flex; flex-direction: column; box-shadow: -30px 0 80px rgba(0,0,0,0.6);
     }
+    .drawer.show { transform: none; }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+    .drawer-head h2 { margin: 0; font-size: 0.95rem; letter-spacing: 0.14em; font-family: var(--mono); color: var(--accent); text-transform: uppercase; }
+    .drawer-body { padding: 18px 20px 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 22px; }
 
-    button {
-      border: 0;
-      border-radius: 999px;
-      padding: 12px 16px;
-      cursor: pointer;
-      background: var(--accent);
-      color: #f4fff5;
-      font-weight: 600;
+    .group { display: flex; flex-direction: column; gap: 11px; }
+    .group > .label { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.24em; color: var(--muted); text-transform: uppercase; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 0.74rem; color: var(--ink-dim); }
+    .field input[type="text"], .field input[type="number"], .field select {
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+      background: #0a121b; color: var(--ink); font-family: var(--mono); font-size: 0.82rem; outline: none;
     }
+    .field input:focus, .field select:focus { border-color: rgba(var(--accent-rgb),0.5); box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.12); }
 
-    button.secondary {
-      background: #e7efe3;
-      color: #294129;
+    .swatches { display: flex; gap: 10px; }
+    .swatches button { width: 30px; height: 30px; border-radius: 9px; border: 2px solid transparent; cursor: pointer; transition: transform .15s; }
+    .swatches button:hover { transform: scale(1.1); }
+    .swatches button.active { border-color: #fff; box-shadow: 0 0 14px currentColor; }
+
+    .toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+    .toggle span { font-size: 0.82rem; color: var(--ink-dim); }
+    .switch { position: relative; width: 42px; height: 24px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; inset: 0; border-radius: 999px; background: #1a2733; border: 1px solid var(--line); transition: background .2s; }
+    .switch .track::before { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); transition: transform .2s, background .2s; }
+    .switch input:checked + .track { background: rgba(var(--accent-rgb),0.25); border-color: rgba(var(--accent-rgb),0.5); }
+    .switch input:checked + .track::before { transform: translateX(18px); background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb),0.6); }
+
+    .cam-edit { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 9px; background: #0a121b; }
+    .cam-edit .row { display: flex; align-items: center; gap: 8px; }
+    .cam-edit .idx { font-family: var(--mono); font-size: 0.62rem; color: var(--accent); border: 1px solid rgba(var(--accent-rgb),0.35); border-radius: 6px; padding: 3px 7px; }
+    .cam-edit .ip { font-family: var(--mono); font-size: 0.66rem; color: var(--muted); margin-left: auto; }
+    .cam-edit .mini-toggles { display: flex; gap: 16px; }
+    .cam-edit .mini-toggles label { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--ink-dim); cursor: pointer; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 16px; border-radius: 11px; border: 1px solid var(--line);
+      background: transparent; color: var(--ink-dim); font-weight: 600; font-size: 0.82rem; cursor: pointer;
+      transition: color .15s, border-color .15s, background .15s;
     }
+    .btn:hover { color: var(--ink); border-color: var(--line-strong); }
+    .btn.danger:hover { color: var(--danger); border-color: rgba(255,93,114,0.4); }
+    .btn.accent { background: var(--accent); color: #04070c; border-color: var(--accent); }
 
-    .footer {
-      padding: 16px 20px 20px;
-      color: var(--muted);
-      font-size: 0.9rem;
+    /* ---------- Tooltip ---------- */
+    #tip {
+      position: fixed; z-index: 200; max-width: 280px; pointer-events: none;
+      padding: 10px 13px; border-radius: 10px;
+      background: #0c1620; border: 1px solid var(--line-strong);
+      color: var(--ink); font-size: 0.76rem; line-height: 1.45;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.55);
+      opacity: 0; transform: translateY(4px); transition: opacity .14s, transform .14s;
     }
+    #tip.show { opacity: 1; transform: none; }
+    #tip .th { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--accent); text-transform: uppercase; display: block; margin-bottom: 4px; }
+    #tip code { font-family: var(--mono); color: var(--accent); background: rgba(var(--accent-rgb),0.1); padding: 1px 5px; border-radius: 5px; }
 
-    @media (max-width: 900px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
+    .help-q {
+      width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line);
+      background: var(--panel); color: var(--ink-dim); cursor: help; flex: none;
+      display: grid; place-items: center; font-family: var(--mono); font-weight: 800; font-size: 1.05rem;
+      transition: color .15s, border-color .15s, box-shadow .15s;
+    }
+    .help-q:hover { color: var(--accent); border-color: rgba(var(--accent-rgb),0.5); box-shadow: 0 0 18px rgba(var(--accent-rgb),0.25); }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 920px) {
+      .top-stats, .search { display: none; }
+      .brand-sub { display: none; }
+    }
+    @media (max-width: 620px) {
+      .topbar { gap: 10px; padding: 12px 14px; }
+      main.deck { padding: 14px; }
+      .cam-grid { grid-template-columns: 1fr !important; }
+      .seg { display: none; }
     }
   </style>
 </head>
 <body>
-  <main>
-    <section class="hero">
-      <h1>Bardi CCTV Local Web View</h1>
-      <p>
-        Halaman ini menarik dua stream CCTV dari bridge lokal VLC. Jika salah satu stream putus, halaman akan mencoba menyambung ulang secara otomatis.
-      </p>
-    </section>
-
-    <section class="layout">
-      <article class="panel">
-        <div class="feed-grid" id="feedGrid">
-          <div class="camera-card">
-            <div class="camera-head">
-              <div>
-                <h2>Loading cameras...</h2>
-                <p>Preparing local bridge</p>
-              </div>
-            </div>
-            <div class="viewer">
-              <div class="badge">Connecting...</div>
-            </div>
-          </div>
+  <div class="app">
+    <!-- ============ TOP BAR ============ -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="scope" aria-hidden="true">
+          <span class="ring"></span><span class="ring inner"></span><span class="sweep"></span>
         </div>
-        <div class="footer">
-          Jika satu panel menunjukkan reconnecting, biarkan beberapa detik atau tekan tombol reload semua untuk memaksa stream dibuka ulang.
+        <div class="brand-text">
+          <span class="brand-name" id="brandName">CCTV_HACK</span>
+          <span class="brand-sub">Surveillance Grid</span>
         </div>
-      </article>
+      </div>
 
-      <aside class="panel sidebar">
+      <div class="top-stats">
+        <div class="stat" data-tip-title="Status armada" data-tip="Jumlah kamera yang sedang menyiarkan live dibanding total kamera terdaftar.">
+          <span class="k">Feeds</span>
+          <span class="v"><span class="on" id="onlineCount">0</span> / <span id="totalCount">0</span></span>
+        </div>
+        <div class="stat" data-tip-title="Beban host" data-tip="Jumlah viewer aktif yang sedang membuka dashboard ini, serta jumlah stream MJPEG aktif yang sedang dibuka dari server.">
+          <span class="k">Load</span>
+          <span class="v"><span id="viewerCount">0</span>U / <span id="streamCount">0</span>S</span>
+        </div>
+        <div class="stat" data-tip-title="Waktu sistem" data-tip="Jam lokal perangkat ini. Dipakai sebagai stempel waktu overlay pada tiap kamera.">
+          <span class="k">System</span>
+          <span class="v" id="clock">--:--:--</span>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <div class="top-actions">
+        <label class="search" data-tip-title="Cari kamera" data-tip="Saring kamera berdasarkan nama, zona, atau alamat IP.">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="search" type="text" placeholder="cari kamera / zona / ip" autocomplete="off">
+        </label>
+
+        <div class="seg" id="layoutSeg" data-tip-title="Tata letak grid" data-tip="Atur jumlah kolom kamera. AUTO menyesuaikan lebar layar secara otomatis.">
+          <button data-cols="auto" class="active">A</button>
+          <button data-cols="1">1</button>
+          <button data-cols="2">2</button>
+          <button data-cols="3">3</button>
+          <button data-cols="4">4</button>
+        </div>
+
+        <div class="seg" id="modeSeg" data-tip-title="Mode feed" data-tip="FAST memakai stream MJPEG langsung agar gerakan terasa lebih hidup. SHARP memakai snapshot JPG berulang yang biasanya lebih hemat dan kadang lebih tajam.">
+          <button data-feed-mode="fast">FAST</button>
+          <button data-feed-mode="sharp" class="active">SHARP</button>
+        </div>
+
+        <button class="iconbtn accent" id="spotBtn" data-tip-title="Mode Spotlight" data-tip="Tampilkan satu kamera layar penuh dan putar otomatis (slideshow) antar kamera. Tekan SPASI untuk play/pause.">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 8 6 4-6 4V8Z"/><rect x="2" y="3" width="20" height="18" rx="3"/></svg>
+        </button>
+
+        <button class="iconbtn" id="fsBtn" data-tip-title="Layar penuh" data-tip="Buka dashboard dalam mode layar penuh (kiosk). Cocok untuk monitor pengawasan.">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3"/></svg>
+        </button>
+
+        <button class="iconbtn" id="settingsBtn" data-tip-title="Pengaturan" data-tip="Ganti nama kamera, zona, warna tema, tata letak, dan opsi tampilan lainnya. Tersimpan otomatis di browser ini.">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </button>
+
+        <button class="help-q" id="helpBtn" data-tip-title="Tentang dashboard ini"
+          data-tip="Browser tidak bisa membuka RTSP langsung, jadi tiap kamera dijembatani menjadi HTTP/MJPEG oleh bridge lokal. • Nama & zona kamera bisa diganti lewat ⚙ Pengaturan dan tersimpan di browser ini. • Untuk akses dari perangkat lain di LAN, buka URL Web UI memakai IP perangkat host. • Jika sebuah panel 'reconnecting', biarkan beberapa detik — stream akan menyambung ulang otomatis.">?</button>
+      </div>
+    </header>
+
+    <!-- ============ CAMERA DECK ============ -->
+    <main class="deck">
+      <div class="cam-grid" id="camGrid" data-cols="auto"></div>
+      <div class="empty" id="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 7h20v10H2zM2 7l4-4h12l4 4"/><circle cx="12" cy="12" r="3"/></svg>
+        <h2 id="emptyTitle">Tidak ada kamera cocok</h2>
+        <p id="emptyMsg">Ubah kata kunci pencarian atau periksa apakah bridge lokal sedang berjalan.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ SPOTLIGHT OVERLAY ============ -->
+  <div class="spotlight" id="spotlight" role="dialog" aria-modal="true">
+    <div class="spot-head">
+      <div class="scope" aria-hidden="true" style="width:34px;height:34px"><span class="ring"></span><span class="sweep"></span></div>
+      <div class="meta">
+        <div class="name" id="spotName">—</div>
+        <div class="sub" id="spotSub">—</div>
+      </div>
+      <span class="badge" id="spotBadge" style="margin-left:8px"><i class="dot"></i> <span>LIVE</span></span>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="spotPlay" data-tip-title="Auto-rotate" data-tip="Putar otomatis antar kamera (slideshow). Atur interval di Pengaturan.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 8 6 4-6 4V8Z"/></svg>
+      </button>
+      <button class="iconbtn" id="spotClose" data-tip-title="Tutup" data-tip="Kembali ke tampilan grid (Esc).">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="spot-body">
+      <button class="spot-nav prev" id="spotPrev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
+      <div class="spot-screen">
+        <img id="spotImg" alt="spotlight feed">
+        <div class="scan"></div>
+        <div class="hud"><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>
+      </div>
+      <button class="spot-nav next" id="spotNext"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></button>
+    </div>
+    <div class="spot-foot"><div class="dots" id="spotDots"></div></div>
+  </div>
+
+  <!-- ============ SETTINGS DRAWER ============ -->
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-label="Pengaturan">
+    <div class="drawer-head">
+      <h2>// Pengaturan</h2>
+      <button class="iconbtn" id="drawerClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="drawer-body">
+      <div class="group">
+        <span class="label">Identitas Sistem</span>
         <div class="field">
-          <h2>Web UI</h2>
-          <span class="value" id="uiUrl"></span>
+          <label>Nama sistem (judul atas)</label>
+          <input type="text" id="setBrand" maxlength="22" placeholder="CCTV_HACK">
         </div>
+      </div>
 
+      <div class="group">
+        <span class="label">Warna Tema</span>
+        <div class="swatches" id="swatches"></div>
+      </div>
+
+      <div class="group">
+        <span class="label">Tata Letak</span>
         <div class="field">
-          <h2>Camera Feeds</h2>
-          <span class="value" id="cameraList">Loading...</span>
+          <label>Kolom grid</label>
+          <select id="setCols">
+            <option value="auto">Auto (menyesuaikan layar)</option>
+            <option value="1">1 kolom</option>
+            <option value="2">2 kolom</option>
+            <option value="3">3 kolom</option>
+            <option value="4">4 kolom</option>
+          </select>
         </div>
-
-        <div class="actions">
-          <button id="reloadAll">Reload All</button>
-          <button class="secondary" id="openCam1">Open Cam 1 Raw</button>
-          <button class="secondary" id="openCam2">Open Cam 2 Raw</button>
-        </div>
-
         <div class="field">
-          <h2>Notes</h2>
-          <ul>
-            <li>Browser tidak membuka RTSP langsung, jadi setiap kamera dijembatani menjadi HTTP/MJPEG.</li>
-            <li>Kamera 1 memakai substream dari `192.168.1.9`.</li>
-            <li>Kamera 2 memakai `Streaming/Channels/102` dari `192.168.1.43:8554`.</li>
-            <li>Untuk akses dari device lain di LAN, buka URL web UI memakai IP laptop ini.</li>
-          </ul>
+          <label>Total feed slots</label>
+          <select id="setFeedSlots">
+            <option value="2">2 slot</option>
+            <option value="4">4 slot</option>
+            <option value="8">8 slot</option>
+          </select>
         </div>
-      </aside>
-    </section>
-  </main>
+      </div>
+
+      <div class="group">
+        <span class="label">Tampilan Overlay</span>
+        <div class="toggle"><span>Bingkai HUD (sudut)</span><label class="switch"><input type="checkbox" id="tHud" checked><span class="track"></span></label></div>
+        <div class="toggle"><span>Efek scanline</span><label class="switch"><input type="checkbox" id="tScan" checked><span class="track"></span></label></div>
+        <div class="toggle"><span>Info kamera (nama/zona)</span><label class="switch"><input type="checkbox" id="tInfo" checked><span class="track"></span></label></div>
+        <div class="toggle"><span>Stempel jam pada feed</span><label class="switch"><input type="checkbox" id="tClock" checked><span class="track"></span></label></div>
+      </div>
+
+      <div class="group">
+        <span class="label">Waktu (detik)</span>
+        <div class="field">
+          <label>Interval reconnect saat stream putus</label>
+          <input type="number" id="setReconnect" min="1" max="60" step="1">
+        </div>
+        <div class="field">
+          <label>Interval slideshow Spotlight</label>
+          <input type="number" id="setSlideshow" min="2" max="120" step="1">
+        </div>
+      </div>
+
+      <div class="group">
+        <span class="label">Kamera</span>
+        <div id="camEditList" style="display:flex;flex-direction:column;gap:12px"></div>
+      </div>
+
+      <button class="btn danger" id="resetBtn">Setel ulang ke bawaan</button>
+    </div>
+  </aside>
+
+  <!-- floating tooltip -->
+  <div id="tip" role="tooltip"></div>
 
   <script>
-    const uiUrl = window.location.href;
-    const feedGrid = document.getElementById("feedGrid");
-    const cameraList = document.getElementById("cameraList");
-    const retryTimers = new Map();
-    let cameras = [];
+  (function () {
+    "use strict";
 
-    document.getElementById("uiUrl").textContent = uiUrl;
+    // ----------------------------------------------------------
+    // Storage
+    // ----------------------------------------------------------
+    var SETTINGS_KEY = "cctvhack.ghostgrid.settings.v1";
+    var CAMS_KEY = "cctvhack.ghostgrid.cameras.v1";
 
-    function setBadge(card, text, color) {
-      const badge = card.querySelector(".badge");
-      badge.textContent = text;
-      badge.style.background = color;
-    }
+    var ACCENTS = {
+      cyan:    { c: "#22d3ee", rgb: "34, 211, 238" },
+      emerald: { c: "#2ee6a6", rgb: "46, 230, 166" },
+      violet:  { c: "#a78bfa", rgb: "167, 139, 250" },
+      amber:   { c: "#f5b942", rgb: "245, 185, 66" },
+      crimson: { c: "#ff5d72", rgb: "255, 93, 114" }
+    };
 
-    function streamUrlFor(camera) {
-      return `${camera.streamPath}?ts=${Date.now()}`;
-    }
+    var defaults = {
+      brand: "CCTV_HACK",
+      accent: "cyan",
+      cols: "auto",
+      feedSlots: 4,
+      feedMode: "sharp",
+      hud: true,
+      scan: true,
+      info: true,
+      clock: true,
+      reconnect: 3,
+      slideshow: 6
+    };
 
-    function retryCamera(camera, card) {
-      const existing = retryTimers.get(camera.id);
-      if (existing) {
-        clearTimeout(existing);
-      }
-
-      setBadge(card, "Reconnecting...", "rgba(148, 102, 12, 0.84)");
-      const timer = setTimeout(() => {
-        const img = card.querySelector("img");
-        img.src = streamUrlFor(camera);
-      }, 2500);
-      retryTimers.set(camera.id, timer);
-    }
-
-    function buildCard(camera) {
-      const card = document.createElement("div");
-      card.className = "camera-card";
-      card.dataset.cameraId = camera.id;
-      card.innerHTML = `
-        <div class="camera-head">
-          <div>
-            <h2>${camera.name}</h2>
-            <p>${camera.ip}</p>
-          </div>
-        </div>
-        <div class="viewer">
-          <div class="badge">Connecting...</div>
-          <img alt="${camera.name}">
-        </div>
-      `;
-
-      const img = card.querySelector("img");
-      img.addEventListener("error", () => {
-        setBadge(card, "Stream error", "rgba(112, 26, 26, 0.82)");
-        retryCamera(camera, card);
-      });
-
-      img.addEventListener("load", () => {
-        setBadge(card, "Live", "rgba(11, 76, 35, 0.82)");
-      });
-
-      img.src = streamUrlFor(camera);
-      return card;
-    }
-
-    async function refreshStatus() {
+    function load(key, fallback) {
       try {
-        const response = await fetch("/api/status", { cache: "no-store" });
-        const payload = await response.json();
-        for (const camera of cameras) {
-          const card = document.querySelector(`[data-camera-id="${camera.id}"]`);
-          if (!card) {
-            continue;
-          }
+        var raw = localStorage.getItem(key);
+        return raw ? Object.assign({}, fallback, JSON.parse(raw)) : Object.assign({}, fallback);
+      } catch (e) { return Object.assign({}, fallback); }
+    }
+    function save(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+    }
 
-          if (payload.cameras[camera.id]) {
-            setBadge(card, "Live", "rgba(11, 76, 35, 0.82)");
-          } else {
-            retryCamera(camera, card);
-          }
-        }
-      } catch (error) {
-        for (const camera of cameras) {
-          const card = document.querySelector(`[data-camera-id="${camera.id}"]`);
-          if (card) {
-            setBadge(card, "Status unavailable", "rgba(112, 26, 26, 0.82)");
-          }
-        }
+    var settings = load(SETTINGS_KEY, defaults);
+    var overrides = load(CAMS_KEY, {}); // { id: {name, zone, hidden, flip} }
+
+    // ----------------------------------------------------------
+    // DOM refs
+    // ----------------------------------------------------------
+    var grid = document.getElementById("camGrid");
+    var empty = document.getElementById("empty");
+    var emptyTitle = document.getElementById("emptyTitle");
+    var emptyMsg = document.getElementById("emptyMsg");
+    var clockEl = document.getElementById("clock");
+    var onlineCountEl = document.getElementById("onlineCount");
+    var totalCountEl = document.getElementById("totalCount");
+    var viewerCountEl = document.getElementById("viewerCount");
+    var streamCountEl = document.getElementById("streamCount");
+    var brandEl = document.getElementById("brandName");
+    var searchEl = document.getElementById("search");
+
+    var cameras = [];          // merged camera objects
+    var cards = {};            // id -> { el, img, state, failSince, retry }
+    var demoMode = false;
+    var VIEWER_SESSION_KEY = "cctvhack.ghostgrid.viewer.sid.v1";
+    var viewerSessionId = ensureViewerSessionId();
+
+    // ----------------------------------------------------------
+    // Tooltip system (hover help, the "?" behaviour)
+    // ----------------------------------------------------------
+    var tip = document.getElementById("tip");
+    var tipTarget = null;
+    function showTip(el) {
+      var text = el.getAttribute("data-tip");
+      if (!text) return;
+      var title = el.getAttribute("data-tip-title");
+      tip.innerHTML = (title ? '<span class="th">' + esc(title) + "</span>" : "") + esc(text).replace(/•/g, "<br>•");
+      tip.classList.add("show");
+      tipTarget = el;
+      positionTip(el);
+    }
+    function positionTip(el) {
+      var r = el.getBoundingClientRect();
+      var tr = tip.getBoundingClientRect();
+      var left = r.left + r.width / 2 - tr.width / 2;
+      var top = r.bottom + 10;
+      if (top + tr.height > window.innerHeight - 8) top = r.top - tr.height - 10;
+      left = Math.max(8, Math.min(left, window.innerWidth - tr.width - 8));
+      tip.style.left = left + "px";
+      tip.style.top = Math.max(8, top) + "px";
+    }
+    function hideTip() { tip.classList.remove("show"); tipTarget = null; }
+    document.addEventListener("mouseover", function (e) {
+      var el = e.target.closest("[data-tip]");
+      if (el && el !== tipTarget) showTip(el);
+    });
+    document.addEventListener("mouseout", function (e) {
+      var el = e.target.closest("[data-tip]");
+      if (el && !el.contains(e.relatedTarget)) hideTip();
+    });
+    window.addEventListener("scroll", hideTip, true);
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+      });
+    }
+
+    function ensureViewerSessionId() {
+      try {
+        var existing = sessionStorage.getItem(VIEWER_SESSION_KEY);
+        if (existing) return existing;
+        var created = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("viewer-" + Date.now() + "-" + Math.random().toString(16).slice(2));
+        sessionStorage.setItem(VIEWER_SESSION_KEY, created);
+        return created;
+      } catch (e) {
+        return "viewer-" + Date.now() + "-" + Math.random().toString(16).slice(2);
       }
     }
 
-    async function init() {
-      const response = await fetch("/api/cameras", { cache: "no-store" });
-      const payload = await response.json();
-      cameras = payload.cameras;
+    // ----------------------------------------------------------
+    // Theme / settings application
+    // ----------------------------------------------------------
+    function applySettings() {
+      var a = ACCENTS[settings.accent] || ACCENTS.cyan;
+      document.documentElement.style.setProperty("--accent", a.c);
+      document.documentElement.style.setProperty("--accent-rgb", a.rgb);
+      brandEl.textContent = settings.brand || "CCTV_HACK";
+      document.body.classList.toggle("no-hud", !settings.hud);
+      document.body.classList.toggle("no-scan", !settings.scan);
+      document.body.classList.toggle("no-info", !settings.info);
+      document.body.classList.toggle("no-clock", !settings.clock);
+      applyCols(settings.cols);
+      syncFeedModeSeg();
+    }
+    function applyCols(cols) {
+      grid.dataset.cols = cols;
+      if (cols === "auto") grid.style.removeProperty("--cols");
+      else grid.style.setProperty("--cols", cols);
+      // sync segmented control
+      Array.prototype.forEach.call(document.querySelectorAll("#layoutSeg button"), function (b) {
+        b.classList.toggle("active", b.dataset.cols === String(cols));
+      });
+    }
+    function normalizeFeedMode(mode) {
+      return mode === "fast" ? "fast" : "sharp";
+    }
+    function syncFeedModeSeg() {
+      var mode = normalizeFeedMode(settings.feedMode);
+      Array.prototype.forEach.call(document.querySelectorAll("#modeSeg button"), function (b) {
+        b.classList.toggle("active", b.dataset.feedMode === mode);
+      });
+    }
 
-      cameraList.textContent = cameras
-        .map((camera) => `${camera.name} -> ${camera.streamPath}`)
-        .join("\n");
+    // ----------------------------------------------------------
+    // Clock
+    // ----------------------------------------------------------
+    var dateFmt = new Intl.DateTimeFormat("id-ID", { weekday: "short", day: "2-digit", month: "short" });
+    function tickClock() {
+      var now = new Date();
+      var t = now.toLocaleTimeString("id-ID", { hour12: false });
+      clockEl.textContent = t;
+      var stamp = dateFmt.format(now).toUpperCase() + " · " + t;
+      Array.prototype.forEach.call(document.querySelectorAll(".clock-ov"), function (el) { el.textContent = stamp; });
+      if (spotState.open) document.getElementById("spotSub").dataset.time = stamp;
+    }
+    setInterval(tickClock, 1000);
 
-      feedGrid.innerHTML = "";
-      cameras.forEach((camera) => feedGrid.appendChild(buildCard(camera)));
+    // ----------------------------------------------------------
+    // Camera loading (with demo fallback)
+    // ----------------------------------------------------------
+    function mergedCamera(raw) {
+      var ov = overrides[raw.id] || {};
+      return {
+        id: raw.id,
+        name: ov.name || raw.name,
+        baseName: raw.name,
+        zone: ov.zone || "",
+        ip: raw.ip,
+        streamPath: raw.streamPath,
+        latestPath: raw.latestPath,
+        profiles: raw.profiles || null,
+        hidden: !!ov.hidden,
+        flip: !!ov.flip,
+        demo: !!raw.demo
+      };
+    }
 
-      document.getElementById("reloadAll").addEventListener("click", () => {
-        cameras.forEach((camera) => {
-          const card = document.querySelector(`[data-camera-id="${camera.id}"]`);
-          if (!card) {
+    function configuredFeedSlots() {
+      return clampNum(settings.feedSlots, 2, 8, 4);
+    }
+
+    function makeGhostSlot(slotNumber) {
+      return {
+        id: "slot-" + slotNumber,
+        name: "EMPTY SLOT " + slotNumber,
+        baseName: "EMPTY SLOT " + slotNumber,
+        zone: "",
+        ip: "OFFLINE / NO CONNECTION",
+        streamPath: null,
+        latestPath: null,
+        profiles: null,
+        hidden: false,
+        flip: false,
+        demo: false,
+        ghost: true
+      };
+    }
+
+    function renderableCameras() {
+      var visible = cameras.filter(function (c) { return !c.hidden; });
+      var target = configuredFeedSlots();
+      var result = visible.slice();
+      for (var slot = result.length + 1; slot <= target; slot++) {
+        result.push(makeGhostSlot(slot));
+      }
+      return result;
+    }
+
+    function demoCameras() {
+      var names = ["Gerbang Depan", "Halaman Belakang", "Garasi", "Lorong", "Gudang", "Atap"];
+      return names.map(function (n, i) {
+        return { id: String(i + 1), name: "CCTV_HACK Node " + (i + 1), ip: "192.168.1." + (10 + i), streamPath: null, latestPath: null, demo: true };
+      });
+    }
+
+    function loadCameras() {
+      return fetch("/api/cameras", { cache: "no-store" })
+        .then(function (r) { if (!r.ok) throw new Error("bad"); return r.json(); })
+        .then(function (p) {
+          if (!p.cameras || !p.cameras.length) throw new Error("empty");
+          demoMode = false;
+          return p.cameras;
+        })
+        .catch(function () { demoMode = true; return demoCameras(); });
+    }
+
+    // ----------------------------------------------------------
+    // Card rendering
+    // ----------------------------------------------------------
+    var ICON = {
+      spotlight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
+      snap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3"/></svg>',
+      flip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 7l4-2v14l-4-2zM21 7l-4-2v14l4-2z"/></svg>',
+      rename: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+      raw: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+      expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3"/></svg>'
+    };
+
+    function buildCard(cam) {
+      var el = document.createElement("article");
+      el.className = "cam" + (cam.flip ? " flip" : "");
+      el.dataset.id = cam.id;
+      el.dataset.state = cam.demo ? "demo" : "connecting";
+
+      el.innerHTML =
+        '<div class="screen">' +
+          (cam.demo ? '<div class="demo"></div>' : '<img class="feed" alt="' + esc(cam.name) + '">') +
+          '<div class="noise"></div>' +
+          '<div class="scan"></div>' +
+          '<div class="hud"><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>' +
+          '<div class="center-msg"><div class="big">' + (cam.demo ? "DEMO FEED" : "NO SIGNAL") + '</div><div class="small">' + esc(cam.ip) + '</div></div>' +
+          '<div class="ov top">' +
+            '<span class="cam-tag">CAM ' + esc(cam.id) + '</span>' +
+            '<span class="badge"><i class="dot"></i> <span class="badge-text">' + (cam.demo ? "DEMO" : "INIT") + '</span></span>' +
+          '</div>' +
+          '<div class="toolbar">' +
+            '<button data-act="spotlight" data-tip="Spotlight / layar besar">' + ICON.spotlight + '</button>' +
+            '<button data-act="snap" data-tip="Ambil snapshot (unduh JPG)">' + ICON.snap + '</button>' +
+            '<button data-act="flip" data-tip="Balik horizontal (mirror)">' + ICON.flip + '</button>' +
+            '<button data-act="rename" data-tip="Ganti nama cepat">' + ICON.rename + '</button>' +
+            '<button data-act="raw" data-tip="Buka stream mentah di tab baru">' + ICON.raw + '</button>' +
+            '<button data-act="expand" data-tip="Layar penuh kamera ini">' + ICON.expand + '</button>' +
+          '</div>' +
+          '<div class="ov bottom">' +
+            '<div class="meta"><div class="name">' + esc(cam.name) + '</div><div class="sub">' + esc(cam.zone ? cam.zone + " · " + cam.ip : cam.ip) + '</div></div>' +
+            '<span class="clock-ov">--:--:--</span>' +
+          '</div>' +
+        '</div>';
+
+      grid.appendChild(el);
+
+      var rec = { el: el, cam: cam, img: el.querySelector(".feed"), failSince: null, retry: null, nextFrame: null };
+      cards[cam.id] = rec;
+
+      // toolbar actions
+      el.querySelector(".toolbar").addEventListener("click", function (e) {
+        var btn = e.target.closest("button"); if (!btn) return;
+        handleAction(btn.dataset.act, cam.id);
+      });
+      // double-click name to rename
+      el.querySelector(".meta .name").addEventListener("dblclick", function () { startRename(cam.id); });
+
+      if (!cam.demo && cam.streamPath) startStream(cam.id);
+      return rec;
+    }
+
+    function buildGhostCard(slotNumber) {
+      var ghost = makeGhostSlot(slotNumber);
+      var el = document.createElement("article");
+      el.className = "cam ghost-slot";
+      el.dataset.id = ghost.id;
+      el.dataset.state = "offline";
+
+      el.innerHTML =
+        '<div class="screen">' +
+          '<div class="demo"></div>' +
+          '<div class="noise"></div>' +
+          '<div class="scan"></div>' +
+          '<div class="hud"><span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span></div>' +
+          '<div class="center-msg"><div class="big">EMPTY SLOT</div><div class="small">Menunggu kamera baru</div></div>' +
+          '<div class="ov top">' +
+            '<span class="cam-tag">SLOT ' + slotNumber + '</span>' +
+            '<span class="badge"><i class="dot"></i> <span class="badge-text">OFFLINE</span></span>' +
+          '</div>' +
+          '<div class="ov bottom">' +
+            '<div class="meta"><div class="name">' + esc(ghost.name) + '</div><div class="sub">' + esc(ghost.ip) + '</div></div>' +
+            '<span class="clock-ov">--:--:--</span>' +
+          '</div>' +
+        '</div>';
+
+      grid.appendChild(el);
+      cards[ghost.id] = { el: el, cam: ghost, img: null, failSince: null, retry: null, nextFrame: null };
+      return cards[ghost.id];
+    }
+
+    function hasModeProfiles(cam) {
+      return !!(
+        cam &&
+        !cam.demo &&
+        (
+          (cam.profiles && (cam.profiles.fast || cam.profiles.sharp)) ||
+          (cam.streamPath && cam.latestPath)
+        )
+      );
+    }
+    function profileForMode(cam, requestedMode) {
+      if (!cam || !cam.profiles) return null;
+      if (requestedMode && cam.profiles[requestedMode]) return cam.profiles[requestedMode];
+      if (cam.profiles.default) return cam.profiles.default;
+      if (cam.profiles.fast) return cam.profiles.fast;
+      if (cam.profiles.sharp) return cam.profiles.sharp;
+      var keys = Object.keys(cam.profiles);
+      return keys.length ? cam.profiles[keys[0]] : null;
+    }
+    function streamPathForMode(cam, requestedMode) {
+      var profile = profileForMode(cam, requestedMode);
+      return (profile && profile.streamPath) || cam.streamPath || "";
+    }
+    function latestPathForMode(cam, requestedMode) {
+      var profile = profileForMode(cam, requestedMode);
+      return (profile && profile.latestPath) || cam.latestPath || "";
+    }
+    function activeFeedMode() {
+      return normalizeFeedMode(settings.feedMode);
+    }
+    function nextFrameDelayMs() {
+      return activeFeedMode() === "sharp" ? 550 : 800;
+    }
+
+    function setState(id, state) {
+      var rec = cards[id]; if (!rec) return;
+      rec.el.dataset.state = state;
+      var bt = rec.el.querySelector(".badge-text");
+      if (bt) {
+        var label = { live: "LIVE", connecting: "RECONNECTING", offline: "OFFLINE", demo: "DEMO" }[state] || state.toUpperCase();
+        if (state !== "demo" && hasModeProfiles(rec.cam)) {
+          label += " " + activeFeedMode().toUpperCase();
+        }
+        bt.textContent = label;
+      }
+    }
+
+    function streamUrl(cam, requestedMode) {
+      var path = streamPathForMode(cam, requestedMode);
+      return path ? path + "?ts=" + Date.now() : "";
+    }
+    function latestUrl(cam, requestedMode) {
+      var path = latestPathForMode(cam, requestedMode);
+      return path ? path + "?ts=" + Date.now() : "";
+    }
+    function prefersFastFeed(cam) {
+      return activeFeedMode() === "fast" && !!streamPathForMode(cam, "fast");
+    }
+    function feedUrl(cam) {
+      if (prefersFastFeed(cam)) {
+        return streamUrl(cam, "fast") || latestUrl(cam, "fast") || streamUrl(cam) || latestUrl(cam);
+      }
+      return latestUrl(cam, "sharp") || latestUrl(cam) || streamUrl(cam, "sharp") || streamUrl(cam);
+    }
+
+    function stopFeedTimers(id) {
+      var rec = cards[id]; if (!rec) return;
+      if (rec.retry) { clearTimeout(rec.retry); rec.retry = null; }
+      if (rec.nextFrame) { clearTimeout(rec.nextFrame); rec.nextFrame = null; }
+    }
+
+    function requestFrame(id) {
+      var rec = cards[id]; if (!rec || !rec.img) return;
+      var url = feedUrl(rec.cam);
+      if (!url) return;
+      rec.img.src = url;
+    }
+
+    function scheduleNextFrame(id) {
+      var rec = cards[id]; if (!rec || !rec.img) return;
+      if (prefersFastFeed(rec.cam)) return;
+      if (rec.nextFrame) clearTimeout(rec.nextFrame);
+      rec.nextFrame = setTimeout(function () {
+        requestFrame(id);
+      }, nextFrameDelayMs());
+    }
+
+    function startStream(id) {
+      var rec = cards[id]; if (!rec || !rec.img) return;
+      var img = rec.img, cam = rec.cam;
+      stopFeedTimers(id);
+
+      img.onload = function () {
+        rec.failSince = null;
+        setState(id, "live");
+        if (!prefersFastFeed(cam)) {
+          scheduleNextFrame(id);
+        }
+      };
+      img.onerror = function () { scheduleRetry(id); };
+      if (cam.latestPath || cam.streamPath) {
+        requestFrame(id);
+      }
+    }
+
+    function refreshAllFeeds() {
+      cameras.forEach(function (cam) {
+        if (!cam.demo && (cam.streamPath || cam.latestPath) && cards[cam.id]) {
+          startStream(cam.id);
+          setState(cam.id, cards[cam.id].el.dataset.state || "connecting");
+        }
+      });
+
+      if (spotState.open) {
+        showSpot(spotState.index);
+      }
+    }
+
+    function scheduleRetry(id) {
+      var rec = cards[id]; if (!rec) return;
+      if (rec.failSince == null) rec.failSince = Date.now();
+      var down = Date.now() - rec.failSince;
+      setState(id, down > 15000 ? "offline" : "connecting");
+      if (rec.retry) clearTimeout(rec.retry);
+      if (rec.nextFrame) clearTimeout(rec.nextFrame);
+      rec.retry = setTimeout(function () {
+        if (rec.img) requestFrame(id);
+      }, Math.max(1, settings.reconnect) * 1000);
+    }
+
+    // ----------------------------------------------------------
+    // Status polling
+    // ----------------------------------------------------------
+    function pollStatus() {
+      if (demoMode) return;
+      fetch("/api/status", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (p) {
+          var on = 0;
+          cameras.forEach(function (cam) {
+            if (cam.hidden) return;
+            var live = p.cameras && p.cameras[cam.id];
+            if (live) {
+              on++;
+              var rec = cards[cam.id];
+              if (rec && rec.el.dataset.state !== "live") {
+                rec.failSince = null;
+                requestFrame(cam.id);
+                setState(cam.id, "connecting");
+              }
+            } else if (cards[cam.id]) {
+              scheduleRetry(cam.id);
+            }
+          });
+          onlineCountEl.textContent = on;
+          updateLoadStats(p);
+        })
+        .catch(function () {});
+    }
+
+    function updateLoadStats(payload) {
+      if (payload && typeof payload.viewerCount === "number") viewerCountEl.textContent = payload.viewerCount;
+      if (payload && typeof payload.activeStreams === "number") streamCountEl.textContent = payload.activeStreams;
+    }
+
+    function sendHeartbeat() {
+      if (demoMode) return;
+      fetch("/api/heartbeat?sid=" + encodeURIComponent(viewerSessionId), { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(updateLoadStats)
+        .catch(function () {});
+    }
+
+    function updateCounts() {
+      var visible = cameras.filter(function (c) { return !c.hidden; });
+      totalCountEl.textContent = Math.max(visible.length, configuredFeedSlots());
+      if (demoMode) onlineCountEl.textContent = visible.length;
+    }
+
+    function requestFullscreenFor(targetEl) {
+      if (!targetEl || !targetEl.requestFullscreen) return Promise.resolve();
+      return targetEl.requestFullscreen().catch(function () {});
+    }
+
+    function exitFullscreenSafe() {
+      if (!document.fullscreenElement || !document.exitFullscreen) return Promise.resolve();
+      return document.exitFullscreen().catch(function () {});
+    }
+
+    function toggleFullscreenFor(targetEl) {
+      if (!targetEl) return Promise.resolve();
+      if (document.fullscreenElement === targetEl) {
+        return exitFullscreenSafe();
+      }
+
+      if (document.fullscreenElement) {
+        return exitFullscreenSafe().then(function () {
+          return requestFullscreenFor(targetEl);
+        });
+      }
+
+      return requestFullscreenFor(targetEl);
+    }
+
+    // ----------------------------------------------------------
+    // Per-camera actions
+    // ----------------------------------------------------------
+    function handleAction(act, id) {
+      var cam = byId(id);
+      if (act === "spotlight" || act === "expand") {
+        if (act === "expand") {
+          var rec = cards[id];
+          if (rec && rec.el) {
+            toggleFullscreenFor(rec.el);
             return;
           }
-          const img = card.querySelector("img");
-          img.src = streamUrlFor(camera);
-        });
-      });
-
-      document.getElementById("openCam1").addEventListener("click", () => {
-        const camera = cameras.find((item) => item.id === "1");
-        if (camera) {
-          window.open(camera.streamPath, "_blank", "noopener");
         }
-      });
-
-      document.getElementById("openCam2").addEventListener("click", () => {
-        const camera = cameras.find((item) => item.id === "2");
-        if (camera) {
-          window.open(camera.streamPath, "_blank", "noopener");
-        }
-      });
-
-      await refreshStatus();
-      window.setInterval(refreshStatus, 4000);
+        openSpotlight(id);
+      } else if (act === "snap") {
+        snapshot(cam);
+      } else if (act === "flip") {
+        cam.flip = !cam.flip;
+        cards[id].el.classList.toggle("flip", cam.flip);
+        setOverride(id, { flip: cam.flip });
+      } else if (act === "rename") {
+        startRename(id);
+      } else if (act === "raw") {
+        var rawPath = streamPathForMode(cam, activeFeedMode()) || streamPathForMode(cam, "fast") || cam.streamPath;
+        if (rawPath) window.open(rawPath, "_blank", "noopener");
+        else toast("Stream mentah hanya tersedia saat bridge aktif");
+      }
     }
 
-    init().catch(() => {
-      cameraList.textContent = "Failed to load camera configuration";
+    function snapshot(cam) {
+      var snapPath = latestPathForMode(cam, activeFeedMode()) || latestPathForMode(cam, "sharp") || cam.latestPath;
+      if (!snapPath) { toast("Snapshot butuh bridge aktif"); return; }
+      var a = document.createElement("a");
+      a.href = snapPath + "?ts=" + Date.now();
+      a.download = (cam.name || "camera").replace(/\s+/g, "_") + "_" + Date.now() + ".jpg";
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    function startRename(id) {
+      var rec = cards[id]; if (!rec) return;
+      var nameEl = rec.el.querySelector(".meta .name");
+      var cam = byId(id);
+      if (nameEl.querySelector("input")) return;
+      var input = document.createElement("input");
+      input.type = "text"; input.value = cam.name; input.maxLength = 28;
+      nameEl.textContent = ""; nameEl.appendChild(input); input.focus(); input.select();
+      function commit() {
+        var v = input.value.trim() || cam.baseName;
+        cam.name = v; nameEl.textContent = v;
+        setOverride(id, { name: v === cam.baseName ? "" : v });
+        renderCamEditList();
+      }
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { input.blur(); }
+        if (e.key === "Escape") { nameEl.textContent = cam.name; }
+      });
+      input.addEventListener("blur", commit);
+    }
+
+    function setOverride(id, patch) {
+      overrides[id] = Object.assign({}, overrides[id], patch);
+      // clean empties
+      Object.keys(overrides[id]).forEach(function (k) {
+        var v = overrides[id][k];
+        if (v === "" || v === false || v == null) delete overrides[id][k];
+      });
+      save(CAMS_KEY, overrides);
+    }
+
+    function byId(id) { for (var i = 0; i < cameras.length; i++) if (cameras[i].id === id) return cameras[i]; return null; }
+
+    // ----------------------------------------------------------
+    // Toast
+    // ----------------------------------------------------------
+    var toastTimer = null;
+    function toast(msg) {
+      var t = document.getElementById("__toast");
+      if (!t) {
+        t = document.createElement("div"); t.id = "__toast";
+        t.style.cssText = "position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:300;padding:11px 18px;border-radius:11px;background:#0c1620;border:1px solid var(--line-strong);color:var(--ink);font-size:.8rem;box-shadow:var(--shadow);opacity:0;transition:opacity .2s,transform .2s;font-family:var(--mono)";
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      requestAnimationFrame(function () { t.style.opacity = "1"; t.style.transform = "translateX(-50%) translateY(0)"; });
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { t.style.opacity = "0"; }, 2200);
+    }
+
+    // ----------------------------------------------------------
+    // Spotlight / slideshow
+    // ----------------------------------------------------------
+    var spotState = { open: false, index: 0, playing: false, timer: null, frameTimer: null, list: [] };
+    var spot = document.getElementById("spotlight");
+    var spotImg = document.getElementById("spotImg");
+    var spotName = document.getElementById("spotName");
+    var spotSub = document.getElementById("spotSub");
+    var spotBadge = document.getElementById("spotBadge");
+    var spotDots = document.getElementById("spotDots");
+
+    function visibleCams() { return cameras.filter(function (c) { return !c.hidden; }); }
+
+    function openSpotlight(id) {
+      spotState.list = visibleCams();
+      if (!spotState.list.length) { toast("Tidak ada kamera"); return; }
+      var idx = 0;
+      if (id) { for (var i = 0; i < spotState.list.length; i++) if (spotState.list[i].id === id) { idx = i; break; } }
+      spotState.open = true;
+      spot.classList.add("show");
+      renderDots();
+      showSpot(idx);
+    }
+    function closeSpotlight() {
+      spotState.open = false; spot.classList.remove("show");
+      stopSlideshow();
+      stopSpotFrameLoop();
+      spotImg.src = "";
+    }
+    function renderDots() {
+      spotDots.innerHTML = "";
+      spotState.list.forEach(function (c, i) {
+        var d = document.createElement("i");
+        d.addEventListener("click", function () { showSpot(i); });
+        spotDots.appendChild(d);
+      });
+    }
+    function stopSpotFrameLoop() {
+      if (spotState.frameTimer) {
+        clearTimeout(spotState.frameTimer);
+        spotState.frameTimer = null;
+      }
+    }
+    function scheduleSpotFrameLoop() {
+      stopSpotFrameLoop();
+      if (!spotState.open) return;
+      var cam = spotState.list[spotState.index];
+      if (!cam || prefersFastFeed(cam) || !latestPathForMode(cam, "sharp")) return;
+      spotState.frameTimer = setTimeout(function () {
+        if (!spotState.open) return;
+        var current = spotState.list[spotState.index];
+        if (!current || prefersFastFeed(current) || !latestPathForMode(current, "sharp")) return;
+        spotImg.src = latestUrl(current, "sharp");
+        scheduleSpotFrameLoop();
+      }, nextFrameDelayMs());
+    }
+    function showSpot(i) {
+      var list = spotState.list;
+      spotState.index = (i + list.length) % list.length;
+      var cam = list[spotState.index];
+      spotName.textContent = cam.name;
+      spotSub.textContent = (cam.zone ? cam.zone + " · " : "") + "CAM " + cam.id + " · " + cam.ip;
+      var bt = spotBadge.querySelector("span");
+      if (cam.demo) { bt.textContent = "DEMO"; spotBadge.style.color = "var(--accent)"; }
+      else {
+        bt.textContent = hasModeProfiles(cam) ? ("LIVE " + activeFeedMode().toUpperCase()) : "LIVE";
+        spotBadge.style.color = "var(--live)";
+      }
+      stopSpotFrameLoop();
+      if (prefersFastFeed(cam) && streamPathForMode(cam, "fast")) {
+        spotImg.src = streamUrl(cam, "fast");
+      }
+      else if (latestPathForMode(cam, "sharp")) {
+        spotImg.src = latestUrl(cam, "sharp");
+        scheduleSpotFrameLoop();
+      }
+      else if (streamPathForMode(cam)) spotImg.src = streamUrl(cam);
+      else spotImg.removeAttribute("src");
+      Array.prototype.forEach.call(spotDots.children, function (d, j) { d.classList.toggle("active", j === spotState.index); });
+    }
+    function nextSpot() { showSpot(spotState.index + 1); }
+    function prevSpot() { showSpot(spotState.index - 1); }
+    function startSlideshow() {
+      spotState.playing = true;
+      document.getElementById("spotPlay").classList.add("live-on");
+      stopTimerOnly();
+      spotState.timer = setInterval(nextSpot, Math.max(2, settings.slideshow) * 1000);
+    }
+    function stopTimerOnly() { if (spotState.timer) { clearInterval(spotState.timer); spotState.timer = null; } }
+    function stopSlideshow() { spotState.playing = false; document.getElementById("spotPlay").classList.remove("live-on"); stopTimerOnly(); }
+    function toggleSlideshow() { spotState.playing ? stopSlideshow() : startSlideshow(); }
+
+    document.getElementById("spotClose").addEventListener("click", closeSpotlight);
+    document.getElementById("spotNext").addEventListener("click", nextSpot);
+    document.getElementById("spotPrev").addEventListener("click", prevSpot);
+    document.getElementById("spotPlay").addEventListener("click", toggleSlideshow);
+    document.getElementById("spotBtn").addEventListener("click", function () { openSpotlight(); startSlideshow(); });
+
+    // ----------------------------------------------------------
+    // Search filter
+    // ----------------------------------------------------------
+    searchEl.addEventListener("input", function () {
+      var q = searchEl.value.trim().toLowerCase();
+      var shown = 0;
+      Object.keys(cards).forEach(function (id) {
+        var rec = cards[id]; if (!rec) return;
+        var cam = rec.cam;
+        var hay = (cam.name + " " + (cam.zone || "") + " " + cam.ip + " cam" + cam.id + (cam.ghost ? " empty slot offline" : "")).toLowerCase();
+        var match = !cam.hidden && (!q || hay.indexOf(q) >= 0);
+        rec.el.style.display = match ? "" : "none";
+        if (match) shown++;
+      });
+      var anyHidden = cameras.some(function (c) { return c.hidden; });
+      empty.classList.toggle("show", shown === 0);
+      if (shown === 0) {
+        if (q) { emptyTitle.textContent = "Tidak ada kamera cocok"; emptyMsg.textContent = 'Tidak ada hasil untuk "' + searchEl.value + '".'; }
+        else { emptyTitle.textContent = "Belum ada kamera tampil"; emptyMsg.textContent = anyHidden ? "Semua kamera disembunyikan. Aktifkan kembali lewat ⚙ Pengaturan." : "Periksa apakah bridge lokal sedang berjalan."; }
+      }
     });
+
+    // ----------------------------------------------------------
+    // Settings drawer
+    // ----------------------------------------------------------
+    var drawer = document.getElementById("drawer");
+    var scrim = document.getElementById("scrim");
+    function openDrawer() { drawer.classList.add("show"); scrim.classList.add("show"); renderCamEditList(); }
+    function closeDrawer() { drawer.classList.remove("show"); scrim.classList.remove("show"); }
+    document.getElementById("settingsBtn").addEventListener("click", openDrawer);
+    document.getElementById("drawerClose").addEventListener("click", closeDrawer);
+    scrim.addEventListener("click", closeDrawer);
+
+    // swatches
+    var swatchWrap = document.getElementById("swatches");
+    Object.keys(ACCENTS).forEach(function (key) {
+      var b = document.createElement("button");
+      b.style.background = ACCENTS[key].c;
+      b.style.color = ACCENTS[key].c;
+      b.title = key;
+      b.dataset.accent = key;
+      b.addEventListener("click", function () {
+        settings.accent = key; save(SETTINGS_KEY, settings); applySettings(); syncSwatches();
+      });
+      swatchWrap.appendChild(b);
+    });
+    function syncSwatches() {
+      Array.prototype.forEach.call(swatchWrap.children, function (b) { b.classList.toggle("active", b.dataset.accent === settings.accent); });
+    }
+
+    // bind simple inputs
+    var setBrand = document.getElementById("setBrand");
+    var setCols = document.getElementById("setCols");
+    var setFeedSlots = document.getElementById("setFeedSlots");
+    var setReconnect = document.getElementById("setReconnect");
+    var setSlideshow = document.getElementById("setSlideshow");
+    var tHud = document.getElementById("tHud");
+    var tScan = document.getElementById("tScan");
+    var tInfo = document.getElementById("tInfo");
+    var tClock = document.getElementById("tClock");
+
+    function pushSettingsToForm() {
+      setBrand.value = settings.brand;
+      setCols.value = settings.cols;
+      setFeedSlots.value = String(clampNum(settings.feedSlots, 2, 8, 4));
+      setReconnect.value = settings.reconnect;
+      setSlideshow.value = settings.slideshow;
+      tHud.checked = settings.hud; tScan.checked = settings.scan; tInfo.checked = settings.info; tClock.checked = settings.clock;
+      syncSwatches();
+    }
+    function commitSettings() { save(SETTINGS_KEY, settings); applySettings(); updateCounts(); }
+
+    setBrand.addEventListener("input", function () { settings.brand = setBrand.value || "CCTV_HACK"; commitSettings(); });
+    setCols.addEventListener("change", function () { settings.cols = setCols.value; commitSettings(); });
+    setFeedSlots.addEventListener("change", function () {
+      settings.feedSlots = clampNum(setFeedSlots.value, 2, 8, 4);
+      setFeedSlots.value = String(settings.feedSlots);
+      commitSettings();
+      rebuildGrid();
+      searchEl.dispatchEvent(new Event("input"));
+    });
+    setReconnect.addEventListener("change", function () { settings.reconnect = clampNum(setReconnect.value, 1, 60, 3); setReconnect.value = settings.reconnect; commitSettings(); });
+    setSlideshow.addEventListener("change", function () { settings.slideshow = clampNum(setSlideshow.value, 2, 120, 6); setSlideshow.value = settings.slideshow; commitSettings(); if (spotState.playing) startSlideshow(); });
+    tHud.addEventListener("change", function () { settings.hud = tHud.checked; commitSettings(); });
+    tScan.addEventListener("change", function () { settings.scan = tScan.checked; commitSettings(); });
+    tInfo.addEventListener("change", function () { settings.info = tInfo.checked; commitSettings(); });
+    tClock.addEventListener("change", function () { settings.clock = tClock.checked; commitSettings(); });
+
+    function clampNum(v, lo, hi, dflt) { v = parseInt(v, 10); if (isNaN(v)) return dflt; return Math.max(lo, Math.min(hi, v)); }
+
+    document.getElementById("resetBtn").addEventListener("click", function () {
+      if (!confirm("Setel ulang semua pengaturan tampilan dan nama kamera kustom?")) return;
+      localStorage.removeItem(SETTINGS_KEY); localStorage.removeItem(CAMS_KEY);
+      settings = Object.assign({}, defaults); overrides = {};
+      applySettings(); pushSettingsToForm();
+      cameras = cameras.map(function (c) { return mergedCamera({ id: c.id, name: c.baseName, ip: c.ip, streamPath: c.streamPath, latestPath: c.latestPath, demo: c.demo }); });
+      rebuildGrid();
+      renderCamEditList();
+      toast("Pengaturan dikembalikan ke bawaan");
+    });
+
+    // camera edit list
+    function renderCamEditList() {
+      var wrap = document.getElementById("camEditList");
+      wrap.innerHTML = "";
+      cameras.forEach(function (cam) {
+        var box = document.createElement("div");
+        box.className = "cam-edit";
+        box.innerHTML =
+          '<div class="row"><span class="idx">CAM ' + esc(cam.id) + '</span><span class="ip">' + esc(cam.ip) + '</span></div>' +
+          '<div class="field"><input type="text" data-k="name" value="' + esc(cam.name) + '" placeholder="Nama kamera"></div>' +
+          '<div class="field"><input type="text" data-k="zone" value="' + esc(cam.zone) + '" placeholder="Zona / lokasi (mis. Lantai 1)"></div>' +
+          '<div class="mini-toggles">' +
+            '<label><input type="checkbox" data-k="flip"' + (cam.flip ? " checked" : "") + '> Mirror</label>' +
+            '<label><input type="checkbox" data-k="hidden"' + (cam.hidden ? " checked" : "") + '> Sembunyikan</label>' +
+          '</div>';
+        wrap.appendChild(box);
+
+        box.addEventListener("input", function (e) {
+          var k = e.target.dataset.k; if (!k) return;
+          if (k === "name") {
+            var v = e.target.value.trim();
+            cam.name = v || cam.baseName;
+            setOverride(cam.id, { name: v && v !== cam.baseName ? v : "" });
+            updateCardLabel(cam);
+          } else if (k === "zone") {
+            cam.zone = e.target.value.trim();
+            setOverride(cam.id, { zone: cam.zone });
+            updateCardLabel(cam);
+          }
+        });
+        box.addEventListener("change", function (e) {
+          var k = e.target.dataset.k; if (!k) return;
+          if (k === "flip") { cam.flip = e.target.checked; setOverride(cam.id, { flip: cam.flip }); if (cards[cam.id]) cards[cam.id].el.classList.toggle("flip", cam.flip); }
+          else if (k === "hidden") { cam.hidden = e.target.checked; setOverride(cam.id, { hidden: cam.hidden }); rebuildGrid(); searchEl.dispatchEvent(new Event("input")); updateCounts(); }
+        });
+      });
+    }
+
+    function updateCardLabel(cam) {
+      var rec = cards[cam.id]; if (!rec) return;
+      var n = rec.el.querySelector(".meta .name");
+      if (n && !n.querySelector("input")) n.textContent = cam.name;
+      var s = rec.el.querySelector(".meta .sub");
+      if (s) s.textContent = cam.zone ? cam.zone + " · " + cam.ip : cam.ip;
+    }
+
+    // ----------------------------------------------------------
+    // Grid (re)build
+    // ----------------------------------------------------------
+    function rebuildGrid() {
+      // clear timers
+      Object.keys(cards).forEach(function (id) {
+        if (cards[id].retry) clearTimeout(cards[id].retry);
+        if (cards[id].nextFrame) clearTimeout(cards[id].nextFrame);
+      });
+      grid.innerHTML = ""; cards = {};
+      var visible = cameras.filter(function (c) { return !c.hidden; });
+      visible.forEach(buildCard);
+      for (var slot = visible.length + 1; slot <= configuredFeedSlots(); slot++) {
+        buildGhostCard(slot);
+      }
+      updateCounts();
+      empty.classList.toggle("show", Object.keys(cards).length === 0);
+      if (visible.length === 0) { emptyTitle.textContent = "Belum ada kamera tampil"; emptyMsg.textContent = demoMode ? "Bridge lokal tidak terdeteksi — menampilkan mode pratinjau." : "Periksa apakah bridge lokal sedang berjalan."; }
+      tickClock();
+    }
+
+    // ----------------------------------------------------------
+    // Fullscreen
+    // ----------------------------------------------------------
+    document.getElementById("fsBtn").addEventListener("click", function () {
+      toggleFullscreenFor(document.documentElement);
+    });
+
+    // ----------------------------------------------------------
+    // Keyboard shortcuts
+    // ----------------------------------------------------------
+    document.addEventListener("keydown", function (e) {
+      if (/input|textarea|select/i.test((e.target.tagName || ""))) return;
+      if (e.key === "Escape") { if (spotState.open) closeSpotlight(); else if (drawer.classList.contains("show")) closeDrawer(); }
+      if (spotState.open) {
+        if (e.key === "ArrowRight") nextSpot();
+        if (e.key === "ArrowLeft") prevSpot();
+        if (e.key === " ") { e.preventDefault(); toggleSlideshow(); }
+      } else {
+        if (e.key.toLowerCase() === "f") document.getElementById("fsBtn").click();
+        if (e.key.toLowerCase() === "s") openDrawer();
+        if (e.key.toLowerCase() === "p") { openSpotlight(); startSlideshow(); }
+      }
+    });
+
+    // layout segmented control
+    document.getElementById("layoutSeg").addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      settings.cols = b.dataset.cols; commitSettings(); setCols.value = settings.cols;
+    });
+
+    document.getElementById("modeSeg").addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      var nextMode = normalizeFeedMode(b.dataset.feedMode);
+      if (nextMode === normalizeFeedMode(settings.feedMode)) return;
+      settings.feedMode = nextMode;
+      commitSettings();
+      refreshAllFeeds();
+      toast(nextMode === "fast" ? "Mode FAST aktif" : "Mode SHARP aktif");
+    });
+
+    // ----------------------------------------------------------
+    // Init
+    // ----------------------------------------------------------
+    function init() {
+      applySettings();
+      pushSettingsToForm();
+      tickClock();
+      loadCameras().then(function (raw) {
+        cameras = raw.map(mergedCamera);
+        rebuildGrid();
+        renderCamEditList();
+        if (!demoMode) {
+          sendHeartbeat();
+          pollStatus();
+          setInterval(sendHeartbeat, 10000);
+          setInterval(pollStatus, 4000);
+        }
+        else toast("Mode pratinjau — bridge lokal tidak aktif");
+      });
+    }
+
+    init();
+  })();
   </script>
 </body>
 </html>

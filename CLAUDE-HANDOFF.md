@@ -54,11 +54,11 @@ Jangan mengganti:
 
 Utama:
 
-- `bardi-cctv-web/index.html`
+- `ghost-grid/index.html`
 
 Kalau sangat perlu untuk tampilan saja, boleh sentuh:
 
-- `bardi-cctv-web/server.py`
+- `ghost-grid/server.py`
 
 Tetapi hanya jika perubahan itu murni untuk cara frontend menerima asset/status, bukan mengubah arsitektur stream.
 
